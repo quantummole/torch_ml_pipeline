@@ -258,4 +258,4 @@ class Debugger :
                     net = net.cpu()
                     torch.cuda.empty_cache()
                 outputs = collate(net_outputs)
-                self.debug_fn(self.debug_dir,debug_info,outputs,ground_truths)
+                self.debug_fn(self.debug_dir,data_id,debug_info,outputs,ground_truths)
