@@ -7,7 +7,7 @@ Created on Wed Sep 12 22:01:16 2018
 from trainer import CrossValidation,DeterministicFold
 from datasets import ImageSiameseDataset
 from models import create_net, CustomNet2
-from model_blocks import SiameseLossList
+from loss import SiameseLossList
 
 import torch
 import torch.nn as nn

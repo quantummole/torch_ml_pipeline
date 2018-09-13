@@ -7,7 +7,7 @@ Created on Wed Sep 12 22:01:16 2018
 from trainer import CrossValidation,ShuffleFold
 from datasets import ImageClassificationDataset
 from models import create_net, CustomNet1
-from model_blocks import ClassificationLossList
+from loss import ClassificationLossList
 
 import torch
 import torch.nn as nn
