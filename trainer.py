@@ -20,6 +20,7 @@ class Fold(object):
     def __call__(self,fold_num):
         raise NotImplementedError
 
+
 class ShuffleFold(Fold) :
     def __init__(self,dataset,training_samples,validation_samples) :
         self.dataset = dataset
@@ -30,6 +31,7 @@ class ShuffleFold(Fold) :
         train_data = self.dataset.sample(n=self.training_samples)
         validation_data = self.dataset.drop(train_data.index)
         return train_data,validation_data
+    
     
 class DeterministicFold(Fold) :
     def __init__(self,dataset,training_samples,validation_samples) :
@@ -44,10 +46,12 @@ class DeterministicFold(Fold) :
             self.folds.append(pruned_dataset.sample(n=min([pruned_dataset.shape[0],self.validation_samples])))
             curr_indices = self.folds[-1].index
             curr_dataset = pruned_dataset
+            
     def __call__(self,fold_num) :
         validation_data = self.folds[fold_num]
         train_data = self.dataset.drop(validation_data.index)
         return train_data,validation_data
+
 
 class CrossValidation :
     def __init__(self,config_params,params_space,debug_mode=False) :
@@ -182,6 +186,7 @@ class CrossValidation :
         for i_data,dataloader in enumerate(dataloaders) :
             debugger(dataloader,dataset_ids[i_data])
             
+            
 class Trainer :
     def __init__(self,device,optimizer,scheduler,train_dataloader,val_dataloader,loss_fn,score_fn) :
         self.device = device
@@ -217,6 +222,7 @@ class Trainer :
                 score += self.score_fn(outputs,ground_truths).item()
             score = score/(i_batch+1)
             return score
+    
     
 class Debugger :
     def __init__(self,device,ensemble,weights,debug_dir,debug_fn) :
