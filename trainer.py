@@ -65,7 +65,7 @@ class CrossValidation :
         self.dataset = config_params["dataset"]
         self.config_dir = config_params["model_dir"]+"/configs"
         self.config_file = self.config_dir+"/config_{}.pkl"
-        self.score_file = self.model_dir+"/score.pkl"
+        self.score_file = config_params["model_dir"]+"/score.pkl"
         self.params_space = params_space
         self.debug_mode = debug_mode
         self.fold_strategy = config_params["fold_strategy"]
