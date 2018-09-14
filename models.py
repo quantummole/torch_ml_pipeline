@@ -29,7 +29,7 @@ class CustomNet1(nn.Module):
             initial_channels += growth_factor
         self.output_layer = nn.Linear(input_dim*input_dim*initial_channels,num_classes)
     
-    def forward(self,inputs,debug=False) :
+    def forward(self,inputs,mode=-1,debug=False) :
         inputs = inputs[0]
         if len(inputs.shape) == 3 :
             bs,m,n = inputs.shape
@@ -52,7 +52,7 @@ class CustomNet2(nn.Module):
             initial_channels += growth_factor
         self.output_layer = nn.Sequential(nn.Linear(input_dim*input_dim*initial_channels,embedding_size),nn.Tanh())
     
-    def forward(self,inputs,debug=False) :
+    def forward(self,inputs,mode=-1,debug=False) :
         outputs = []
         for inp in inputs :
             if len(inp.shape) == 3 :

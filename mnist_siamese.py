@@ -54,7 +54,7 @@ if __name__ == "__main__" :
                     "val_dataset" : {"transform_sequence" : None,
                                  "classes_per_sample" : 10
                                  },
-                    "objectives" : {"loss_fn" : SiameseLossList([siamese_loss],[1.0]),
+                    "objectives" : {"loss_fn" : [[SiameseLossList([siamese_loss],[1.0])]],
                                     "score_fn" : SiameseLossList([siamese_loss],[1.0])
                                     }
                     }

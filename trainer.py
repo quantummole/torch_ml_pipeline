@@ -137,11 +137,16 @@ class CrossValidation :
                 val_dataloader = data.DataLoader(val_dataset,np.int(1.5*batch_size),num_workers = workers)
                 loss_fn = params["objectives"]["loss_fn"]
                 score_fn = params["objectives"]["score_fn"]
-                trainer = Trainer(self.device,optimizer,scheduler,train_dataloader,val_dataloader,loss_fn,score_fn)
+                trainers = []
+                for i in range(len(loss_fn)) :
+                    trainer = Trainer(self.device,optimizer,scheduler,train_dataloader,val_dataloader,loss_fn[i],score_fn)
+                    trainers.append(trainer)
                 for epoch in range(max_epochs) :
                     if issubclass(self.scheduler,torch.optim.lr_scheduler._LRScheduler) :
                         scheduler.step()
-                    train_loss = trainer.train(net)
+                    train_loss = []
+                    for mode,trainer in enumerate(trainers) :
+                        train_loss.append(trainer.train(net,mode))
                     val_loss = trainer.validate(net)
                     if not issubclass(self.scheduler,torch.optim.lr_scheduler._LRScheduler) :
                         scheduler.step(val_loss)
@@ -169,7 +174,7 @@ class CrossValidation :
     def debug(self,dataloaders,dataset_ids,debug_fn) :
         config_scores = self.get_scores()
         config_ids = config_scores.keys()
-        config_weights = np.array([1.0/config_scores[cid][1] for cid in config_ids])
+        config_weights = np.array([1.0/config_scores[cid][-1] for cid in config_ids])
         config_weights = config_weights/np.sum(config_weights)
         ensemble = []
         weights = []
@@ -197,14 +202,14 @@ class Trainer :
         self.loss_fn = loss_fn
         self.score_fn = score_fn
         
-    def train(self,net) :
+    def train(self,net,mode) :
         net.train()
         loss_value = 0
         for i_batch,sample_batch in enumerate(self.train_dataloader) :
             inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
             ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
             self.optimizer.zero_grad()
-            outputs = net(inputs)
+            outputs = net(inputs,mode)
             loss = self.loss_fn(outputs,ground_truths)
             loss.backward()
             self.optimizer.step()
