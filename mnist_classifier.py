@@ -42,8 +42,8 @@ if __name__ == "__main__" :
                     "data" : {"training_split" : 0.8},
                     "train_dataset" : {"transform_sequence" : None},
                     "val_dataset" : {"transform_sequence" : None},
-                    "objectives" : {"loss_fn" : ClassificationLossList([nn.CrossEntropyLoss],[1.0]),
-                                    "score_fn" : ClassificationLossList([nn.CrossEntropyLoss],[1.0])
+                    "objectives" : {"loss_fn" : ClassificationLossList([[nn.CrossEntropyLoss]],[[1.0]]),
+                                    "score_fn" : ClassificationLossList([[nn.CrossEntropyLoss]],[[1.0]])
                                     }
                     }
 

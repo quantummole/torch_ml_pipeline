@@ -6,15 +6,15 @@ Created on Thu Sep 13 22:05:55 2018
 """
 
 class ClassificationLossList :
-    def __init__(self,list_loss_fn,weights) :
-        self.loss_fn = [loss_fn() for loss_fn in list_loss_fn]
+    def __init__(self,list_list_loss_fn,weights) :
+        self.loss_fn = [[loss_fn() for loss_fn in list_loss_fn] for list_loss_fn in list_list_loss_fn]
         self.weights = weights
     def __call__(self,predictions,labels):
         loss = 0
         num_outputs = len(predictions)
-        for i in range(len(self.loss_fn)) :
-            for j in range(num_outputs) :
-                loss +=  self.weights[i]*self.loss_fn[i](predictions[j],labels[j])/num_outputs
+        for i in range(num_outputs) :
+            for j in range(len(self.loss_fn[i])) :
+                loss +=  self.weights[i][j]*self.loss_fn[i][j](predictions[i],labels[i])/num_outputs
         return loss
  
 class SiameseLossList :
