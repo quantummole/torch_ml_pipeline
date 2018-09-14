@@ -44,3 +44,5 @@ class RandomSearch(Search) :
         config_id = self.generate_config_id(params)
         self.store_config(config_id,params)
         return config_id,params
+    def tune(self,val_score) :
+        pass
