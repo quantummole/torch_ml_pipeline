@@ -4,7 +4,10 @@ Created on Wed Sep 12 22:01:16 2018
 
 @author: quantummole
 """
-from trainer import CrossValidation,ShuffleFold
+
+from fold_strategy import ShuffleFoldGroups
+from search_strategy import RandomSearch
+from trainer import CrossValidation
 from datasets import ImageClassificationDataset
 from models import create_net, CustomNet1
 from loss import ClassificationLossList
@@ -21,7 +24,8 @@ if __name__ == "__main__" :
                      "model_dir" : "./models/mnist_classifier",
                      "device" : torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                      "dataset" :ImageClassificationDataset,
-                     "fold_strategy" : ShuffleFold
+                     "fold_strategy" : ShuffleFoldGroups,
+                     "search_strategy" : RandomSearch
                      }
     
     params_space = {"network" : {"growth_factor" : [5,10,16],
@@ -44,7 +48,8 @@ if __name__ == "__main__" :
                     "val_dataset" : {"transform_sequence" : None},
                     "objectives" : {"loss_fn" : [[ClassificationLossList([[nn.CrossEntropyLoss]],[[1.0]])]],
                                     "score_fn" : ClassificationLossList([[nn.CrossEntropyLoss]],[[1.0]])
-                                    }
+                                    },
+                    "fold_options" : {"group_keys" : [["label"]]}
                     }
 
     print("creating dataset",flush=True)
@@ -52,6 +57,6 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     scheme = CrossValidation(config_params,params_space)
     print("begin tuning",flush=True)
-    config_scores  = scheme.cross_validate(dataset,25,2,scheme.RandomSearch)
+    config_scores  = scheme.cross_validate(dataset,25,2)
     print("tuning completed" ,config_scores,flush=True)
     

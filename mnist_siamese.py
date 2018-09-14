@@ -4,7 +4,9 @@ Created on Wed Sep 12 22:01:16 2018
 
 @author: quantummole
 """
-from trainer import CrossValidation,DeterministicFold
+from fold_strategy import DeterministicFold
+from search_strategy import RandomSearch
+from trainer import CrossValidation
 from datasets import ImageSiameseDataset
 from models import create_net, CustomNet2
 from loss import SiameseLossList
@@ -29,7 +31,8 @@ if __name__ == "__main__" :
                      "model_dir" : "./models/mnist_siamese",
                      "device" : torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                      "dataset" :ImageSiameseDataset,
-                     "fold_strategy" : DeterministicFold
+                     "fold_strategy" : DeterministicFold,
+                     "search_strategy" : RandomSearch
                      }
     
     params_space = {"network" : {"growth_factor" : [5,10,16],
@@ -64,6 +67,6 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     scheme = CrossValidation(config_params,params_space)
     print("begin tuning",flush=True)
-    config_scores  = scheme.cross_validate(dataset,25,5,scheme.RandomSearch)
+    config_scores  = scheme.cross_validate(dataset,25,5)
     print("tuning completed" ,config_scores,flush=True)
     

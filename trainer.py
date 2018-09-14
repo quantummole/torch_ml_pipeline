@@ -6,52 +6,10 @@ Created on Mon Sep 10 11:02:42 2018
 """
 
 
-import random
 import numpy as np
 import pickle
 import torch
 from torch.utils import data
-
-
-class Fold(object):
-    def __init__(self,dataset,training_samples,validation_samples):
-        pass
-
-    def __call__(self,fold_num):
-        raise NotImplementedError
-
-
-class ShuffleFold(Fold) :
-    def __init__(self,dataset,training_samples,validation_samples) :
-        self.dataset = dataset
-        self.training_samples = training_samples
-        self.validation_samples = validation_samples
-    
-    def __call__(self,fold_num) :
-        train_data = self.dataset.sample(n=self.training_samples)
-        validation_data = self.dataset.drop(train_data.index)
-        return train_data,validation_data
-    
-    
-class DeterministicFold(Fold) :
-    def __init__(self,dataset,training_samples,validation_samples) :
-        self.dataset = dataset
-        self.training_samples = training_samples
-        self.validation_samples = validation_samples
-        self.folds = []
-        curr_indices = []
-        curr_dataset = self.dataset
-        for i in range(0,training_samples+validation_samples,validation_samples) :
-            pruned_dataset = curr_dataset.drop(curr_indices)
-            self.folds.append(pruned_dataset.sample(n=min([pruned_dataset.shape[0],self.validation_samples])))
-            curr_indices = self.folds[-1].index
-            curr_dataset = pruned_dataset
-            
-    def __call__(self,fold_num) :
-        validation_data = self.folds[fold_num]
-        train_data = self.dataset.drop(validation_data.index)
-        return train_data,validation_data
-
 
 class CrossValidation :
     def __init__(self,config_params,params_space,debug_mode=False) :
@@ -69,27 +27,8 @@ class CrossValidation :
         self.params_space = params_space
         self.debug_mode = debug_mode
         self.fold_strategy = config_params["fold_strategy"]
+        self.search_strategy = config_params["search_strategy"](self.params_space,self.config_file)
         
-    def RandomSearch(self) : 
-        config_id = np.int(10000*random.random())
-        print("generating configuration {}".format(config_id),flush=True)
-        params = {}
-        for method in self.params_space.keys() :
-            params[method] = {}
-            for key in self.params_space[method].keys():
-                values = self.params_space[method][key]
-                value = -1
-                if isinstance(values, list) :
-                    random.shuffle(values)
-                    value = values[0]
-                else : 
-                    value = values
-                params[method][key] = value
-        file = open(self.config_file.format(config_id), 'wb')
-        pickle.dump(params,file)
-        file.close()
-        return config_id,params
-    
     def get_params(self,config_id) :
         file = open(self.config_file.format(config_id), 'rb')
         params = pickle.load(file)
@@ -107,17 +46,13 @@ class CrossValidation :
         file.close()
         return scores
     
-    def cross_validate(self,dataset,max_epochs,num_configs,tune_fn) :
-        total_samples = dataset.shape[0]
+    def cross_validate(self,dataset,max_epochs,num_configs) :
         config_scores = {}
         for config_batch in range(num_configs) :
-            config_id,params = tune_fn()
+            config_id,params = self.search_strategy()
             training_split = params["data"]["training_split"]
-            validation_split = 1 - training_split
-            training_samples = np.int(training_split*total_samples)
-            validation_samples = total_samples - training_samples
-            sampler = self.fold_strategy(dataset,training_samples,validation_samples)
-            num_folds = np.int(np.ceil(1.0/validation_split))
+            sampler = self.fold_strategy(dataset,training_split,**params.get("fold_options",{}))
+            num_folds = sampler.num_folds
             validation = []
             training = []
             print("beginning cross validation",flush=True)
@@ -129,8 +64,8 @@ class CrossValidation :
                 scheduler = self.scheduler(optimizer,**params["scheduler"])
                 curr_best = params["constants"]["val_best"]
                 train_data,validation_data = sampler(fold)
-                train_dataset = self.dataset(train_data,**params["train_dataset"])
-                val_dataset = self.dataset(validation_data,**params["val_dataset"])
+                train_dataset = self.dataset(train_data,**params.get("train_dataset",{}))
+                val_dataset = self.dataset(validation_data,**params.get("val_dataset",{}))
                 batch_size = params["loader"]["batch_size"]
                 workers = params["loader"]["workers"]
                 train_dataloader = data.DataLoader(train_dataset,batch_size,shuffle=True,num_workers = workers)
@@ -164,7 +99,8 @@ class CrossValidation :
             validation = np.array(validation)
             indices = np.argmax(validation,axis=1)
             avg_validation_loss = np.mean(np.max(validation,axis=1))
-            avg_training_loss = np.mean(training[range(num_folds),indices])
+            avg_training_loss = np.mean(training[range(num_folds),indices],axis=0)
+            self.search_strategy.tune(avg_validation_loss)
             config_scores[config_id] = [avg_training_loss,avg_validation_loss]
             print("config output",config_id,avg_training_loss,avg_validation_loss,flush=True)
         print("saving final scores",flush=True)

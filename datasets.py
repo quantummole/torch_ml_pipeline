@@ -44,7 +44,7 @@ class ImageSiameseDataset(Dataset) :
     def __len__(self) :
         return np.min(self.group_counts)
     def __getitem__(self,idx) :
-        classes =  np.random.choice(self.groups,size=self.classes_per_sample,replace=False)
+        classes =  np.random.choice(self.groups,size=min([self.classes_per_sample,self.num_groups]),replace=False)
         inputs = []
         labels = []
         for cls in classes :
