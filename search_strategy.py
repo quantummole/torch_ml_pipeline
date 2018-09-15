@@ -16,7 +16,7 @@ class Search(object) :
     def generate_config_id(self,params) :
         md5 = hashlib.md5()
         md5.update(pickle.dumps(params))
-        md5.update(str(random.random()))
+        md5.update(pickle.dumps(random.random()))
         return md5.hexdigest()
     def store_config(self,config_id,params) :
         print("generating configuration {}".format(config_id),flush=True)
