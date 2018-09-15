@@ -109,3 +109,24 @@ class CustomNet3(nn.Module):
         rnn_output =  torch.mean(rnn_output,dim=0)
         classification_output = self.output_classifier(rnn_output)
         return [outputs,classification_output]
+
+class CustomNet4(nn.Module):
+    def __init__(self,num_classes_classification,num_classes_seg,output_dim,model_class) :
+        super(CustomNet4,self).__init__()
+        self.num_classes = num_classes_classification
+        self.num_classes_seg = num_classes_seg
+        self.output_dim = output_dim
+        self.model = model_class(num_classes = self.num_classes+self.output_dim*self.output_dim*self.num_classes_seg)
+    def forward(self,inputs,mode=-1,debug=False) :
+        inputs = inputs[0]
+        if len(inputs.shape) == 3 :
+            bs,m,n = inputs.shape
+            inputs = torch.stack([inputs,inputs,inputs],dim=1)
+        bs,c,m,n = inputs.shape
+        output = self.model(inputs)
+        classification_output = output[:,0:self.num_classes]
+        if mode == 0  and self.training:
+            return [classification_output]
+        else :
+            outputs = output[:,self.num_classes:].view(bs,self.num_classes_seg,self.output_dim,self.output_dim)
+            return [classification_output,outputs]
