@@ -10,6 +10,7 @@ import numpy as np
 import pickle
 import torch
 from torch.utils import data
+from tqdm import tqdm
 
 class CrossValidation :
     def __init__(self,config_params,params_space,debug_mode=False) :
@@ -137,31 +138,34 @@ class Trainer :
         self.scheduler = scheduler
         self.loss_fn = loss_fn
         self.score_fn = score_fn
-        
     def train(self,net,mode) :
         net.train()
         loss_value = 0
-        for i_batch,sample_batch in enumerate(self.train_dataloader) :
-            inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
-            ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
-            self.optimizer.zero_grad()
-            outputs = net(inputs,mode)
-            loss = self.loss_fn(outputs,ground_truths)
-            loss.backward()
-            self.optimizer.step()
-            loss_value += loss.detach().item()
+        with tqdm(self.train_dataloader) as loader :
+            for i_batch,sample_batch in enumerate(loader) :
+                inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
+                ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                self.optimizer.zero_grad()
+                outputs = net(inputs,mode)
+                loss = self.loss_fn(outputs,ground_truths)
+                loss.backward()
+                self.optimizer.step()
+                loss_value += loss.detach().item()
+                loader.set_postfix(isTraining=net.training, loss=(loss_value/(i_batch+1)))
         return loss_value/(i_batch+1)
             
     def validate(self,net) :
         with torch.no_grad():
             net.eval()
             score = 0
-            for i_batch,sample_batch in enumerate(self.val_dataloader) :
-                inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
-                ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
-                outputs = net(inputs)
-                score += self.score_fn(outputs,ground_truths).item()
-            score = score/(i_batch+1)
+            with tqdm(self.val_dataloader) as loader :
+                for i_batch,sample_batch in enumerate(loader) :
+                    inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
+                    ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                    outputs = net(inputs)
+                    score += self.score_fn(outputs,ground_truths).item()
+                    loader.set_postfix(isTraining=net.training, score=(score/(i_batch+1)))
+                score = score/(i_batch+1)
             return score
     
     
@@ -183,20 +187,21 @@ class Debugger :
                     output = output + out[i]
                 final_outputs.append(output)
             return final_outputs
-        
+
         with torch.no_grad():
-            for i_batch,sample_batch in enumerate(dataloader) :
-                inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
-                ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
-                debug_info = sample_batch['debug_info']
-                outputs = []
-                for i_net,net in enumerate(self.ensemble) :
-                    net = net.to(self.device)
-                    net.eval()
-                    net_outputs = net(inputs,debug=True)
-                    net_outputs = [self.weights[i_net]*output for output in net_outputs]
-                    outputs.append(net_outputs)
-                    net = net.cpu()
-                    torch.cuda.empty_cache()
-                outputs = collate(net_outputs)
-                self.debug_fn(self.debug_dir,data_id,debug_info,outputs,ground_truths)
+            with tqdm(self.dataloader) as loader :
+                for i_batch,sample_batch in enumerate(loader) :
+                    inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
+                    ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                    debug_info = sample_batch['debug_info']
+                    outputs = []
+                    for i_net,net in enumerate(self.ensemble) :
+                        net = net.to(self.device)
+                        net.eval()
+                        net_outputs = net(inputs,debug=True)
+                        net_outputs = [self.weights[i_net]*output for output in net_outputs]
+                        outputs.append(net_outputs)
+                        net = net.cpu()
+                        torch.cuda.empty_cache()
+                    outputs = collate(net_outputs)
+                    self.debug_fn(self.debug_dir,data_id,debug_info,outputs,ground_truths)
