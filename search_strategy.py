@@ -14,7 +14,10 @@ class Search(object) :
         self.params_space = params_space
         self.config_file = config_file
     def generate_config_id(self,params) :
-        return hashlib.md5(pickle.dumps(params)).hexdigest()
+        md5 = hashlib.md5()
+        md5.update(pickle.dumps(params))
+        md5.update(str(random.random()))
+        return md5.hexdigest()
     def store_config(self,config_id,params) :
         print("generating configuration {}".format(config_id),flush=True)
         file = open(self.config_file.format(config_id),"wb")
