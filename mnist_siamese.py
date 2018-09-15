@@ -50,7 +50,10 @@ if __name__ == "__main__" :
                                    "T_max" : 5
                                    },
                     "constants" : {"val_best" : 10},
-                    "data" : {"training_split" : 0.8},
+                    "data" : {"training_split" : 0.5,
+                              "train_dataset" : [[{"transform_sequence" : None}]],
+                              "val_dataset" : [[{"transform_sequence" : None}]],
+                              },
                     "train_dataset" : {"transform_sequence" : None,
                                  "classes_per_sample" : 10
                                  },
@@ -67,6 +70,6 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     scheme = CrossValidation(config_params,params_space)
     print("begin tuning",flush=True)
-    config_scores  = scheme.cross_validate(dataset,25,5)
+    config_scores  = scheme.cross_validate(dataset,5,2)
     print("tuning completed" ,config_scores,flush=True)
     

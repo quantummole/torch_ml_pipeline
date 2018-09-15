@@ -43,9 +43,10 @@ if __name__ == "__main__" :
                                    "T_max" : 5
                                    },
                     "constants" : {"val_best" : 10},
-                    "data" : {"training_split" : 0.8},
-                    "train_dataset" : {"transform_sequence" : None},
-                    "val_dataset" : {"transform_sequence" : None},
+                    "data" : {"training_split" : 0.5,
+                              "train_dataset" : [[{"transform_sequence" : None}]],
+                              "val_dataset" : [[{"transform_sequence" : None}]],
+                              },
                     "objectives" : {"loss_fn" : [[ClassificationLossList([[nn.CrossEntropyLoss]],[[1.0]])]],
                                     "score_fn" : ClassificationLossList([[nn.CrossEntropyLoss]],[[1.0]])
                                     },
@@ -57,6 +58,6 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     scheme = CrossValidation(config_params,params_space)
     print("begin tuning",flush=True)
-    config_scores  = scheme.cross_validate(dataset,25,2)
+    config_scores  = scheme.cross_validate(dataset,5,2)
     print("tuning completed" ,config_scores,flush=True)
     
