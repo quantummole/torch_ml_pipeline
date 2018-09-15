@@ -14,10 +14,11 @@ from PIL import Image
 import torchvision.datasets as datasets
 
 class ImageClassificationDataset(Dataset) :
-    def __init__(self,data,transform_sequence = None) :
+    def __init__(self,data,mode = -1,transform_sequence = None) :
         super(ImageClassificationDataset,self).__init__()
         self.image_paths = data.path.values.tolist()
         self.image_class = data.label.values.tolist()
+        self.mode = mode
         self.transform_sequence = transform_sequence
     def __len__(self) :
         return len(self.image_class)
@@ -32,7 +33,7 @@ class ImageClassificationDataset(Dataset) :
         return {"inputs":[im],"ground_truths":[label]}
 
 class ImageSiameseDataset(Dataset) :
-    def __init__(self,data,classes_per_sample,transform_sequence = None) :
+    def __init__(self,data,classes_per_sample,mode = -1,transform_sequence = None) :
         super(ImageSiameseDataset,self).__init__()
         self.data_groups = data.groupby(["label"])
         self.groups = list(self.data_groups.groups.keys())
@@ -42,6 +43,7 @@ class ImageSiameseDataset(Dataset) :
         self.image_class = data.label.values.tolist()
         self.transform_sequence = transform_sequence
         self.classes_per_sample = classes_per_sample
+        self.mode = mode
     def __len__(self) :
         return np.min(self.group_counts)
     def __getitem__(self,idx) :
@@ -61,7 +63,7 @@ class ImageSiameseDataset(Dataset) :
         return {"inputs":inputs,"ground_truths":labels}
 
 class FGClassificationDataset(Dataset) :
-    def __init__(self,data,transform_sequence = None) :
+    def __init__(self,data,mode = -1,transform_sequence = None) :
         super(FGClassificationDataset,self).__init__()
         self.image_paths = data.path.values.tolist()
         self.image_class = data.label.values.tolist()
@@ -70,16 +72,13 @@ class FGClassificationDataset(Dataset) :
         self.image_hs = data.height.values.tolist()
         self.image_ws = data.width.values.tolist()
         self.transform_sequence = transform_sequence
+        self.mode = mode
     def __len__(self) :
         return len(self.image_class)
     def __getitem__(self,idx) :
         path = self.image_paths[idx]
         gts = []
         im = pydicom.read_file(path).pixel_array
-        img = Image.fromarray(im)
-        if self.transform_sequence :
-            img = self.transform_sequence(img)
-        im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
         mask = np.zeros_like(im)
         label = np.long(self.image_class[idx])
         x = np.int(clean_null(self.image_xs[idx],0))
@@ -91,7 +90,12 @@ class FGClassificationDataset(Dataset) :
         for i in range(0,m,32) :
            for j in range(0,n,32) :
                gts.append(np.long(1*(np.mean(mask[i:i+32,j:j+32]) > 0.1)))
-        return {"inputs":[im],"ground_truths":[np.array(gts).reshape((m//32,n//32)),label]}
+        img = Image.fromarray(im)
+        if self.transform_sequence :
+            img = self.transform_sequence(img)
+        im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
+
+        return {"inputs":[im],"ground_truths":[label,np.array(gts).reshape((m//32,n//32))]}
 
 
 def clean_null(x,y) :

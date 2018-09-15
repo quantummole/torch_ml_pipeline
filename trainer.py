@@ -65,16 +65,16 @@ class CrossValidation :
                 scheduler = self.scheduler(optimizer,**params["scheduler"])
                 curr_best = params["constants"]["val_best"]
                 train_data,validation_data = sampler(fold)
-                train_dataset = self.dataset(train_data,**params.get("train_dataset",{}))
-                val_dataset = self.dataset(validation_data,**params.get("val_dataset",{}))
-                batch_size = params["loader"]["batch_size"]
-                workers = params["loader"]["workers"]
-                train_dataloader = data.DataLoader(train_dataset,batch_size,shuffle=True,num_workers = workers)
-                val_dataloader = data.DataLoader(val_dataset,np.int(1.5*batch_size),num_workers = workers)
                 loss_fn = params["objectives"]["loss_fn"]
                 score_fn = params["objectives"]["score_fn"]
                 trainers = []
                 for i in range(len(loss_fn)) :
+                    train_dataset = self.dataset(train_data,mode=i,**params["data"].get("train_dataset",[{}]*(i+1))[i])
+                    val_dataset = self.dataset(validation_data,mode=i,**params["data"].get("val_dataset",[{}]*(i+1))[i])
+                    batch_size = params["loader"]["batch_size"]
+                    workers = params["loader"]["workers"]
+                    train_dataloader = data.DataLoader(train_dataset,batch_size,shuffle=True,num_workers = workers)
+                    val_dataloader = data.DataLoader(val_dataset,np.int(1.5*batch_size),num_workers = workers)
                     trainer = Trainer(self.device,optimizer,scheduler,train_dataloader,val_dataloader,loss_fn[i],score_fn)
                     trainers.append(trainer)
                 for epoch in range(max_epochs) :
@@ -151,7 +151,7 @@ class Trainer :
                 loss.backward()
                 self.optimizer.step()
                 loss_value += loss.detach().item()
-                loader.set_postfix(isTraining=net.training, loss=(loss_value/(i_batch+1)))
+                loader.set_postfix(isTraining=net.training, loss=(loss_value/(i_batch+1)), mode=mode)
         return loss_value/(i_batch+1)
             
     def validate(self,net) :
