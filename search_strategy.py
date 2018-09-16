@@ -15,8 +15,7 @@ class Search(object) :
         self.config_file = config_file
         self.param_grid  = [len(self.params_space[key][value]) if isinstance(self.params_space[key][value],list) else 1 for key in self.params_space.keys() for value in self.params_space[key].keys()]
         self.max_configs = reduce(lambda x, y: x*y, self.param_grid)
-        self.curr_state = [0  for l  in self.param_grid]
-        self.curr_state[0] = -1
+        self.curr_state = None
 
     def generate_config_id(self,params) :
         md5 = hashlib.md5()
@@ -56,6 +55,9 @@ class GridSearch(Search) :
         super(GridSearch,self).__init__(params_space,config_file)
         self.param_keys = self.params_space.keys()
         self.param_names_grid = [[value for value in self.params_space[key]] for key in self.param_keys] 
+        self.curr_state = [0  for l  in self.param_grid]
+        self.curr_state[0] = -1
+
     def get_next_state(self,curr_state,max_grid):
         if curr_state == []:
             return []
