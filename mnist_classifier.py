@@ -6,7 +6,7 @@ Created on Wed Sep 12 22:01:16 2018
 """
 
 from fold_strategy import ShuffleFoldGroups
-from search_strategy import RandomSearch
+from search_strategy import GridSearch
 from trainer import CrossValidation
 from datasets import ImageClassificationDataset
 from models import create_net, CustomNet1
@@ -25,7 +25,7 @@ if __name__ == "__main__" :
                      "device" : torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                      "dataset" :ImageClassificationDataset,
                      "fold_strategy" : ShuffleFoldGroups,
-                     "search_strategy" : RandomSearch
+                     "search_strategy" : GridSearch
                      }
     
     params_space = {"network" : {"growth_factor" : [5,10,16],
@@ -58,6 +58,6 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     scheme = CrossValidation(config_params,params_space)
     print("begin tuning",flush=True)
-    config_scores  = scheme.cross_validate(dataset,5,2)
+    config_scores  = scheme.cross_validate(dataset,15)
     print("tuning completed" ,config_scores,flush=True)
     
