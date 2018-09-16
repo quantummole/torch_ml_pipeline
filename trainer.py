@@ -47,8 +47,11 @@ class CrossValidation :
         file.close()
         return scores
     
-    def cross_validate(self,dataset,max_epochs,num_configs) :
+    def cross_validate(self,dataset,max_epochs,num_configs=None) :
         config_scores = {}
+        if not num_configs :
+            num_configs = self.search_strategy.max_configs
+        print("# configurations to search : {}".format(num_configs),flush=True)
         for config_batch in range(num_configs) :
             config_id,params = self.search_strategy()
             training_split = params["data"]["training_split"]
