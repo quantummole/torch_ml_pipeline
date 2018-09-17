@@ -14,10 +14,36 @@ class create_net :
     def __init__(self,net) :
         self.net = net
     def __call__(self,network_params,weights = None) :
-        network = self.net(**network_params)
+        network = nn.DataParallel(self.net(**network_params))
         if weights :
             network.load_state_dict(torch.load(weights,map_location=lambda storage, loc: storage))
         return network
+
+class DensenetModels(nn.Module) :
+    def __init__(self,model) :
+        self.model = model(pretrained=True)
+        self.final_layer_features = self.model.classifier.in_features
+    def update_final_layer(self,final_layer) :
+        self.model.classifier = final_layer
+    def forward(self,inputs) :
+        if len(inputs.shape) == 3 :
+            bs,m,n = inputs.shape
+            inputs = inputs.view(bs,1,m,n)
+        return self.model(inputs)
+
+
+class ResnetModels(nn.Module) :
+    def __init__(self,model) :
+        self.model = model(pretrained=True)
+        self.final_layer_features = self.model.fc.in_features
+    def update_final_layer(self,final_layer) :
+        self.model.fc = final_layer
+    def forward(self,inputs) :
+        if len(inputs.shape) == 3 :
+            bs,m,n = inputs.shape
+            inputs = inputs.view(bs,1,m,n)
+        return self.model(inputs)
+
     
 class CustomNet1(nn.Module):
     def __init__(self,input_dim,initial_channels,growth_factor,num_classes) :
@@ -68,7 +94,7 @@ class CustomNet2(nn.Module):
         return outputs
 
 class CustomNet3(nn.Module):
-    def __init__(self,input_dim,initial_channels,growth_factor,num_classes_seg,num_classes_classify,hidden_size) :
+    def __init__(self,num_classes_seg,num_classes_classify,hidden_size) :
         super(CustomNet3,self).__init__()
         self.layer = nn.ModuleList()
         self.num_classes = num_classes_seg
@@ -116,7 +142,8 @@ class CustomNet4(nn.Module):
         self.num_classes = num_classes_classification
         self.num_classes_seg = num_classes_seg
         self.output_dim = output_dim
-        self.model = model_class(num_classes = self.num_classes+self.output_dim*self.output_dim*self.num_classes_seg)
+        self.model = model_class
+        self.model.update_final_layer(nn.Linear(self.final_layer_features,self.num_classes+self.output_dim*self.output_dim*self.num_classes_seg))
     def forward(self,inputs,mode=-1,debug=False) :
         inputs = inputs[0]
         if len(inputs.shape) == 3 :
