@@ -57,6 +57,7 @@ class CrossValidation :
             training_split = params["data"]["training_split"]
             sampler = self.fold_strategy(dataset,training_split,**params.get("fold_options",{}))
             num_folds = sampler.num_folds
+            params["data"]["num_folds"] = num_folds
             validation = []
             training = []
             print("beginning cross validation",flush=True)
@@ -71,13 +72,15 @@ class CrossValidation :
                 loss_fn = params["objectives"]["loss_fn"]
                 score_fn = params["objectives"]["score_fn"]
                 trainers = []
+                batch_size = params["loader"]["batch_size"]
+                workers = params["loader"]["workers"]
+                val_dataset = self.dataset(validation_data,mode=0,**params["data"].get("val_dataset",{}))
+                val_dataloader = data.DataLoader(val_dataset,np.int(1.5*batch_size),num_workers = workers)
+
+
                 for i in range(len(loss_fn)) :
-                    train_dataset = self.dataset(train_data,mode=i,**params["data"].get("train_dataset",[{}]*(i+1))[i])
-                    val_dataset = self.dataset(validation_data,mode=i,**params["data"].get("val_dataset",[{}]*(i+1))[i])
-                    batch_size = params["loader"]["batch_size"]
-                    workers = params["loader"]["workers"]
+                    train_dataset = self.dataset(train_data,mode=i+1,**params["data"].get("train_dataset",[{}]*(i+1))[i])
                     train_dataloader = data.DataLoader(train_dataset,batch_size,shuffle=True,num_workers = workers)
-                    val_dataloader = data.DataLoader(val_dataset,np.int(1.5*batch_size),num_workers = workers)
                     trainer = Trainer(self.device,optimizer,scheduler,train_dataloader,val_dataloader,loss_fn[i],score_fn)
                     trainers.append(trainer)
                 for epoch in range(max_epochs) :
@@ -107,6 +110,7 @@ class CrossValidation :
             self.search_strategy.tune(avg_validation_loss)
             config_scores[config_id] = [avg_training_loss,avg_validation_loss]
             print("config output",config_id,avg_training_loss,avg_validation_loss,flush=True)
+            self.save_scores(config_scores)
         print("saving final scores",flush=True)
         self.save_scores(config_scores)
         return config_scores
@@ -120,10 +124,8 @@ class CrossValidation :
         weights = []
         for i_config,cid in enumerate(config_ids) :
             params = self.get_params(cid)
-            training_split = params["data"]["training_split"]
-            validation_split = 1 - training_split
-            num_folds = np.int(np.ceil(1.0/validation_split))
-            ensemble = ensemble + [self.network(params["network"],self.model_file(cid,fold)) for fold in range(num_folds)]
+            num_folds = params["data"]["num_folds"]
+            ensemble = ensemble + [self.network(params["network"],self.model_file.format(cid,fold)) for fold in range(num_folds)]
             weights = weights + [config_weights[i_config]/num_folds for fold in range(num_folds)]
         weights = np.array(weights)
         weights = weights/np.sum(weights)
@@ -192,7 +194,7 @@ class Debugger :
             return final_outputs
 
         with torch.no_grad():
-            with tqdm(self.dataloader) as loader :
+            with tqdm(dataloader) as loader :
                 for i_batch,sample_batch in enumerate(loader) :
                     inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
@@ -206,5 +208,5 @@ class Debugger :
                         outputs.append(net_outputs)
                         net = net.cpu()
                         torch.cuda.empty_cache()
-                    outputs = collate(net_outputs)
+                    outputs = collate(outputs)
                     self.debug_fn(self.debug_dir,data_id,debug_info,outputs,ground_truths)

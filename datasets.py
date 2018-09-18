@@ -13,6 +13,10 @@ import pydicom
 from PIL import Image
 import torchvision.datasets as datasets
 
+#mode = -1 is for test and debug
+#mode = 0 is for validation
+#mode = {1,2,3..} is for training
+
 class ImageClassificationDataset(Dataset) :
     def __init__(self,data,mode = -1,transform_sequence = None) :
         super(ImageClassificationDataset,self).__init__()
