@@ -66,41 +66,6 @@ class ImageSiameseDataset(Dataset) :
                 labels.append(cls)
         return {"inputs":inputs,"ground_truths":labels}
 
-class FGClassificationDataset(Dataset) :
-    def __init__(self,data,mode = -1,transform_sequence = None) :
-        super(FGClassificationDataset,self).__init__()
-        self.image_paths = data.path.values.tolist()
-        self.image_class = data.label.values.tolist()
-        self.image_xs = data.x.values.tolist()
-        self.image_ys = data.y.values.tolist()
-        self.image_hs = data.height.values.tolist()
-        self.image_ws = data.width.values.tolist()
-        self.transform_sequence = transform_sequence
-        self.mode = mode
-    def __len__(self) :
-        return len(self.image_class)
-    def __getitem__(self,idx) :
-        path = self.image_paths[idx]
-        gts = []
-        im = pydicom.read_file(path).pixel_array
-        mask = np.zeros_like(im)
-        label = np.long(self.image_class[idx])
-        x = np.int(clean_null(self.image_xs[idx],0))
-        y = np.int(clean_null(self.image_ys[idx],0))
-        h = np.int(clean_null(self.image_hs[idx],0))
-        w = np.int(clean_null(self.image_ws[idx],0))
-        mask[y:y+h,x:x+w] = 1.0       
-        m,n = im.shape 
-        for i in range(0,m,32) :
-           for j in range(0,n,32) :
-               gts.append(np.long(1*(np.mean(mask[i:i+32,j:j+32]) > 0.1)))
-        img = Image.fromarray(im)
-        if self.transform_sequence :
-            img = self.transform_sequence(img)
-        im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
-
-        return {"inputs":[im],"ground_truths":[label,np.array(gts).reshape((m//32,n//32))]}
-
 
 def clean_null(x,y) :
     return x if pd.notnull(x) else y
