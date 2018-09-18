@@ -45,39 +45,19 @@ class ResnetModels(nn.Module) :
         return self.model(inputs)
 
     
-class CustomNet1(nn.Module):
-    def __init__(self,input_dim,initial_channels,growth_factor,num_classes) :
-        super(CustomNet1,self).__init__()
+class CustomNetClassification(nn.Module):
+    def __init__(self,input_dim, final_conv_dim, initial_channels,growth_factor,num_classes) :
+        super(CustomNetClassification,self).__init__()
         self.layer = nn.ModuleList()
-        while input_dim >= 8 :
+        while input_dim >= final_conv_dim :
             self.layer.append(nn.Sequential(DoubleConvLayer(initial_channels,initial_channels+growth_factor,3,1),
                                             nn.MaxPool2d(kernel_size=3,stride=2,padding=1)))
             input_dim = input_dim//2
             initial_channels += growth_factor
-        self.output_layer = nn.Linear(input_dim*input_dim*initial_channels,num_classes)
-    
-    def forward(self,inputs,mode=-1,debug=False) :
-        inputs = inputs[0]
-        if len(inputs.shape) == 3 :
-            bs,m,n = inputs.shape
-            inputs = inputs.view(bs,1,m,n)
-        bs,c,m,n = inputs.shape
-        for layer in self.layer :
-            inputs = layer(inputs)
-        inputs = inputs.view(bs,-1)    
-        output = self.output_layer(inputs)
-        return [output]
-
-class CustomNet2(nn.Module):
-    def __init__(self,input_dim,initial_channels,growth_factor,embedding_size) :
-        super(CustomNet2,self).__init__()
-        self.layer = nn.ModuleList()
-        while input_dim >= 8 :
-            self.layer.append(nn.Sequential(DoubleConvLayer(initial_channels,initial_channels+growth_factor,3,1),
-                                            nn.MaxPool2d(kernel_size=3,stride=2,padding=1)))
-            input_dim = input_dim//2
-            initial_channels += growth_factor
-        self.output_layer = nn.Sequential(nn.Linear(input_dim*input_dim*initial_channels,embedding_size),nn.Tanh())
+        num_units = input_dim*input_dim*initial_channels
+        self.output_layer = nn.Sequential(nn.Linear(num_units,2*num_units),nn.ReLU(),
+                                          nn.Linear(2*num_units,2*num_units),nn.ReLU(),
+                                          nn.Linear(2*num_units,num_classes))
     
     def forward(self,inputs,mode=-1,debug=False) :
         outputs = []
@@ -92,26 +72,3 @@ class CustomNet2(nn.Module):
             output = self.output_layer(inp)
             outputs.append(output)
         return outputs
-    
-
-class CustomNet3(nn.Module):
-    def __init__(self,num_classes_classification,num_classes_seg,output_dim,model_class) :
-        super(CustomNet3,self).__init__()
-        self.num_classes = num_classes_classification
-        self.num_classes_seg = num_classes_seg
-        self.output_dim = output_dim
-        self.model = model_class
-        self.model.update_final_layer(nn.Linear(self.final_layer_features,self.num_classes+self.output_dim*self.output_dim*self.num_classes_seg))
-    def forward(self,inputs,mode=-1,debug=False) :
-        inputs = inputs[0]
-        if len(inputs.shape) == 3 :
-            bs,m,n = inputs.shape
-            inputs = torch.stack([inputs,inputs,inputs],dim=1)
-        bs,c,m,n = inputs.shape
-        output = self.model(inputs)
-        classification_output = output[:,0:self.num_classes]
-        if mode == 0  and self.training:
-            return [classification_output]
-        else :
-            outputs = output[:,self.num_classes:].view(bs,self.num_classes_seg,self.output_dim,self.output_dim)
-            return [classification_output,outputs]
