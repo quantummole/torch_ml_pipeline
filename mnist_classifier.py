@@ -21,7 +21,12 @@ import numpy as np
 def debug_fn(debug_dir,data_id,debug_info,outputs,ground_truths) :
     image_ids = debug_info[0]
     output_vals =  np.argmax(nn.functional.softmax(outputs[0],dim=1).cpu().numpy(),axis=1)
-    data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),output_vals.reshape(-1,1)]),columns=["ImageId","Label"])
+    if len(ground_truths) == 0 :
+        data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),output_vals.reshape(-1,1)]),columns=["ImageId","Label"])
+    else :
+        gt = ground_truths[0].cpu().numpy().reshape(-1,1)
+        data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),gt,output_vals.reshape(-1,1)]),columns=["ImageId","Label"])
+        
     data.to_csv(debug_dir+"/"+data_id+".csv",header=False,index=False,mode="a+")
 
 if __name__ == "__main__" :
@@ -35,7 +40,7 @@ if __name__ == "__main__" :
                      "search_strategy" : GridSearch
                      }
     
-    params_space = {"network" : {"growth_factor" : [5,10,15,20],
+    params_space = {"network" : {"growth_factor" : [5,10,15,20,25,30,35],
                                  "input_dim" : 28,
                                  "final_conv_dim" : 8,
                                  "initial_channels" : 1,
@@ -48,7 +53,7 @@ if __name__ == "__main__" :
                                    "weight_decay" : 5e-2
                                    },
                     "scheduler" : {"eta_min" : 1e-8,
-                                   "T_max" : 40
+                                   "T_max" : 30
                                    },
                     "constants" : {"val_best" : 10},
                     "data" : {"training_split" : 0.5,
@@ -67,7 +72,7 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     scheme = CrossValidation(config_params,params_space)
     print("begin tuning",flush=True)
-    config_scores  = scheme.cross_validate(dataset,40)
+    config_scores  = scheme.cross_validate(dataset,120)
     print("tuning completed" ,config_scores,flush=True)
     PATH = "../datasets/mnist/testSet"
     import os
@@ -75,4 +80,4 @@ if __name__ == "__main__" :
     image_files = [PATH+"/img_"+i+".jpg" for i in image_ids]
     test_dataset = np.hstack([np.array(image_ids).reshape(-1,1),np.array(image_files).reshape(-1,1)])
     test_dataset = pd.DataFrame(test_dataset,columns=["id","path"])
-    scheme.debug([test_dataset,test_dataset],["test_scores","test_scores1"],debug_fn)
+    scheme.debug([test_dataset,dataset],["test_scores","train_scores"],debug_fn)

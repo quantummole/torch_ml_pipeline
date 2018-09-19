@@ -25,30 +25,46 @@ class create_net :
 
 class DensenetModels(nn.Module) :
     def __init__(self,model) :
+        super(DensenetModels,self).__init__()
         self.model = model(pretrained=True)
         self.final_layer_features = self.model.classifier.in_features
     def update_final_layer(self,final_layer) :
         self.model.classifier = final_layer
     def forward(self,inputs,mode) :
-        if len(inputs.shape) == 3 :
-            bs,m,n = inputs.shape
-            inputs = inputs.view(bs,1,m,n)
-        return self.model(inputs)
+        outputs = []
+        for inp in inputs :
+            if len(inp.shape) == 3 :
+                bs,m,n = inp.shape
+                inp = inp.view(bs,3,m,n)
+            outputs.append(self.model(inputs))
+        return outputs
 
 
 class ResnetModels(nn.Module) :
     def __init__(self,model) :
+        super(ResnetModels,self).__init__()
         self.model = model(pretrained=True)
         self.final_layer_features = self.model.fc.in_features
     def update_final_layer(self,final_layer) :
         self.model.fc = final_layer
     def forward(self,inputs,mode) :
-        if len(inputs.shape) == 3 :
-            bs,m,n = inputs.shape
-            inputs = inputs.view(bs,1,m,n)
-        return self.model(inputs)
+        outputs = []
+        for inp in inputs :
+            if len(inp.shape) == 3 :
+                bs,m,n = inp.shape
+                inp = inp.view(bs,3,m,n)
+            outputs.append(self.model(inputs))
+        return outputs
 
-    
+class PreTrainedClassifier(nn.Module) :
+    def __init__(self,model,num_classes) :
+        super(PreTrainedClassifier,self).__init__()
+        self.model = model
+        self.num_classes = num_classes
+        self.model.update_final_layer(nn.Linear(self.model.final_layer_features,self.num_classes))
+    def forward(self,inputs,mode) :
+        return self.model(inputs,mode)
+   
 class CustomNetClassification(nn.Module):
     def __init__(self,input_dim, final_conv_dim, initial_channels,growth_factor,num_classes) :
         super(CustomNetClassification,self).__init__()

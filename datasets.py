@@ -26,6 +26,11 @@ class ImageClassificationDataset(Dataset) :
         self.image_paths = data.path.values.tolist()
         if not self.mode == -1 :
             self.image_class = data.label.values.tolist()
+        else :
+            if "label" in data.columns:
+                self.image_class = data.label.values.tolist()
+            else :
+                self.image_class = None
     def __len__(self) :
         return len(self.image_paths)
     def __getitem__(self,idx) :
@@ -39,7 +44,10 @@ class ImageClassificationDataset(Dataset) :
             label = np.long(self.image_class[idx])
             return {"inputs":[im],"ground_truths":[label]}
         else :
-            return {"inputs":[im],"ground_truths":[],"debug_info":[self.image_id[idx]]}
+            gt =[]
+            if self.image_class :
+                gt = [np.long(self.image_class[idx])]
+            return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
 
 class ImageSiameseDataset(Dataset) :
     def __init__(self,data,classes_per_sample,mode = -1,transform_sequence = None) :
