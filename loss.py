@@ -8,7 +8,7 @@ import torch
 
 class ClassificationLossList :
     def __init__(self,list_list_loss_fn,weights) :
-        self.loss_fn = [[loss_fn() for loss_fn in list_loss_fn] for list_loss_fn in list_list_loss_fn]
+        self.loss_fn = list_list_loss_fn
         self.weights = weights
     def __call__(self,predictions,labels):
         loss = 0
@@ -20,7 +20,7 @@ class ClassificationLossList :
  
 class SiameseLossList :
     def __init__(self,list_loss_fn,weights) :
-        self.loss_fn = [loss_fn() for loss_fn in list_loss_fn]
+        self.loss_fn = list_loss_fn
         self.weights = weights
     def __call__(self,predictions,labels):
         loss = 0

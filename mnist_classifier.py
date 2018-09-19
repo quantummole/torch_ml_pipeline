@@ -64,8 +64,8 @@ if __name__ == "__main__" :
                               "train_dataset" : [[{"transform_sequence" : None}]],
                               "val_dataset" : {"transform_sequence" : None},
                               },
-                    "objectives" : {"loss_fn" : [[ClassificationLossList([[nn.CrossEntropyLoss]],[[1.0]])]],
-                                    "score_fn" : ClassificationLossList([[Accuracy]],[[1.0]])
+                    "objectives" : {"loss_fn" : [[ClassificationLossList([[nn.CrossEntropyLoss()]],[[1.0]])]],
+                                    "score_fn" : ClassificationLossList([[Accuracy()]],[[1.0]])
                                     },
                     "fold_options" : {"group_keys" : [["label"]]},
                     "bootstrap_options" : {"group_keys" : [["label"]],
