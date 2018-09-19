@@ -20,12 +20,14 @@ import torchvision.datasets as datasets
 class ImageClassificationDataset(Dataset) :
     def __init__(self,data,mode = -1,transform_sequence = None) :
         super(ImageClassificationDataset,self).__init__()
-        self.image_paths = data.path.values.tolist()
-        self.image_class = data.label.values.tolist()
         self.mode = mode
         self.transform_sequence = transform_sequence
+        self.image_id = data.id.values.tolist()
+        self.image_paths = data.path.values.tolist()
+        if not self.mode == -1 :
+            self.image_class = data.label.values.tolist()
     def __len__(self) :
-        return len(self.image_class)
+        return len(self.image_paths)
     def __getitem__(self,idx) :
         path = self.image_paths[idx]
         im = io.imread(path)
@@ -33,8 +35,11 @@ class ImageClassificationDataset(Dataset) :
         if self.transform_sequence :
             img = self.transform_sequence(img)
         im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
-        label = np.long(self.image_class[idx])
-        return {"inputs":[im],"ground_truths":[label]}
+        if not self.mode == -1 :
+            label = np.long(self.image_class[idx])
+            return {"inputs":[im],"ground_truths":[label]}
+        else :
+            return {"inputs":[im],"ground_truths":[],"debug_info":[self.image_id[idx]]}
 
 class ImageSiameseDataset(Dataset) :
     def __init__(self,data,classes_per_sample,mode = -1,transform_sequence = None) :

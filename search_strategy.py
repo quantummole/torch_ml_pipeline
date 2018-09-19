@@ -23,7 +23,6 @@ class Search(object) :
         md5.update(pickle.dumps(random.random()))
         return md5.hexdigest()
     def store_config(self,config_id,params) :
-        print("generating configuration {}".format(config_id),flush=True)
         file = open(self.config_file.format(config_id),"wb")
         pickle.dump(params,file)
         file.close()

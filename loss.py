@@ -4,6 +4,7 @@ Created on Thu Sep 13 22:05:55 2018
 
 @author: quantummole
 """
+import torch 
 
 class ClassificationLossList :
     def __init__(self,list_list_loss_fn,weights) :
@@ -14,7 +15,7 @@ class ClassificationLossList :
         num_outputs = len(predictions)
         for i in range(num_outputs) :
             for j in range(len(self.loss_fn[i])) :
-                loss +=  self.weights[i][j]*self.loss_fn[i][j](predictions[i],labels[i])/num_outputs
+                loss +=  self.weights[i][j]*self.loss_fn[i][j](predictions[i],labels[i].type(torch.cuda.LongTensor))/num_outputs
         return loss
  
 class SiameseLossList :
@@ -31,4 +32,9 @@ class SiameseLossList :
                 negatives = predictions[0:2*cls] + predictions[2*(cls+1):2*num_classes]
                 loss +=  self.weights[i]*self.loss_fn[i](positives,anchors,negatives)/num_classes
         return loss    
-    
+
+class Accuracy :
+    def __init__(self) : pass
+    def __call__(self,predictions,labels) :
+        _,vals = torch.max(predictions,dim=1)
+        return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))

@@ -10,6 +10,10 @@ import torch.nn.functional as tfunc
 from torchvision import models
 from model_blocks import DoubleConvLayer
 
+#mode = -1 is for debug
+#mode = 0 is for test and validation
+#mode = {1,2,3..} is for training
+
 class create_net :
     def __init__(self,net) :
         self.net = net
@@ -25,7 +29,7 @@ class DensenetModels(nn.Module) :
         self.final_layer_features = self.model.classifier.in_features
     def update_final_layer(self,final_layer) :
         self.model.classifier = final_layer
-    def forward(self,inputs) :
+    def forward(self,inputs,mode) :
         if len(inputs.shape) == 3 :
             bs,m,n = inputs.shape
             inputs = inputs.view(bs,1,m,n)
@@ -38,7 +42,7 @@ class ResnetModels(nn.Module) :
         self.final_layer_features = self.model.fc.in_features
     def update_final_layer(self,final_layer) :
         self.model.fc = final_layer
-    def forward(self,inputs) :
+    def forward(self,inputs,mode) :
         if len(inputs.shape) == 3 :
             bs,m,n = inputs.shape
             inputs = inputs.view(bs,1,m,n)
@@ -59,7 +63,7 @@ class CustomNetClassification(nn.Module):
                                           nn.Linear(2*num_units,2*num_units),nn.ReLU(),
                                           nn.Linear(2*num_units,num_classes))
     
-    def forward(self,inputs,mode=-1,debug=False) :
+    def forward(self,inputs,mode) :
         outputs = []
         for inp in inputs :
             if len(inp.shape) == 3 :
