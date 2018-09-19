@@ -56,7 +56,11 @@ class ShuffleFoldGroups(Fold) :
         super(ShuffleFoldGroups,self).__init__(dataset,training_split)
         self.group_keys = group_keys
     def __call__(self,fold_num) :
+        orig_index_length = self.dataset.index[0]
+        orig_index_length = 1 if np.isscalar(orig_index_length) else len(orig_index_length)
         dataset_groups = self.dataset.groupby(self.group_keys)
         train_data = dataset_groups.apply(lambda x : x.sample(frac=self.training_split))
-        validation_data = self.dataset.drop([x[-1] for x in train_data.index.values.tolist()])
+        new_index_length = len(train_data.index[0])
+        ignore_length = new_index_length - orig_index_length
+        validation_data = self.dataset.drop([x[ignore_length:] for x in train_data.index.values.tolist()])
         return train_data,validation_data

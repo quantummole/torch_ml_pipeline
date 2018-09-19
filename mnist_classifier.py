@@ -4,10 +4,11 @@ Created on Wed Sep 12 22:01:16 2018
 
 @author: quantummole
 """
-
+from trainer import Trainer, Debugger
 from fold_strategy import ShuffleFoldGroups
+from bootstrap_strategy import OverSample
 from search_strategy import GridSearch
-from trainer import CrossValidation
+from validation import CrossValidationPipeline
 from datasets import ImageClassificationDataset
 from models import create_net, CustomNetClassification
 from loss import ClassificationLossList, Accuracy
@@ -25,7 +26,7 @@ def debug_fn(debug_dir,data_id,debug_info,outputs,ground_truths) :
         data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),output_vals.reshape(-1,1)]),columns=["ImageId","Label"])
     else :
         gt = ground_truths[0].cpu().numpy().reshape(-1,1)
-        data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),gt,output_vals.reshape(-1,1)]),columns=["ImageId","Label"])
+        data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),gt,output_vals.reshape(-1,1)]),columns=["ImageId","Ground Truth","Label"])
         
     data.to_csv(debug_dir+"/"+data_id+".csv",header=False,index=False,mode="a+")
 
@@ -37,10 +38,13 @@ if __name__ == "__main__" :
                      "device" : torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                      "dataset" :ImageClassificationDataset,
                      "fold_strategy" : ShuffleFoldGroups,
-                     "search_strategy" : GridSearch
+                     "search_strategy" : GridSearch,
+                     "bootstrap_strategy" : OverSample,
+                     "trainer" : Trainer,
+                     "debugger" : Debugger
                      }
     
-    params_space = {"network" : {"growth_factor" : [5,10,15,20,25,30,35],
+    params_space = {"network" : {"growth_factor" : [10,15,20],
                                  "input_dim" : 28,
                                  "final_conv_dim" : 8,
                                  "initial_channels" : 1,
@@ -63,16 +67,19 @@ if __name__ == "__main__" :
                     "objectives" : {"loss_fn" : [[ClassificationLossList([[nn.CrossEntropyLoss]],[[1.0]])]],
                                     "score_fn" : ClassificationLossList([[Accuracy]],[[1.0]])
                                     },
-                    "fold_options" : {"group_keys" : [["label"]]}
+                    "fold_options" : {"group_keys" : [["label"]]},
+                    "bootstrap_options" : {"group_keys" : [["label"]],
+                                           "num_samples" : 2,
+                                           "fraction" : 1}
                     }
 
     print("creating dataset",flush=True)
     dataset = pd.read_csv("../datasets/mnist/train.csv",names=["path","label"])
     dataset["id"] = dataset["path"]
     print("initializing validation scheme",flush=True)
-    scheme = CrossValidation(config_params,params_space)
+    scheme = CrossValidationPipeline(config_params,params_space)
     print("begin tuning",flush=True)
-    config_scores  = scheme.cross_validate(dataset,120)
+    config_scores  = scheme.run(dataset,120)
     print("tuning completed" ,config_scores,flush=True)
     PATH = "../datasets/mnist/testSet"
     import os
