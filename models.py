@@ -36,7 +36,7 @@ class DensenetModels(nn.Module) :
             if len(inp.shape) == 3 :
                 bs,m,n = inp.shape
                 inp = torch.stack([inp,inp,inp],dim=1)
-            outputs.append(self.model(inputs))
+            outputs.append(self.model(inp))
         return outputs
 
 
@@ -53,7 +53,7 @@ class ResnetModels(nn.Module) :
             if len(inp.shape) == 3 :
                 bs,m,n = inp.shape
                 inp = torch.stack([inp,inp,inp],dim=1)
-            outputs.append(self.model(inputs))
+            outputs.append(self.model(inp))
         return outputs
 
 class PreTrainedClassifier(nn.Module) :
