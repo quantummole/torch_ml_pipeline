@@ -66,7 +66,7 @@ class CrossValidationPipeline :
                                              "fold_weights" : fold_weights
                                              }
                 self.save_scores(config_scores)
-                config_iter.set_postfix(validation_loss = avg_validation_loss, training_loss = avg_training_loss, val_deviation =  np.std(1.0/(len(batch_weights)*1.0/avg_validation_loss*batch_weights)))   
+                config_iter.set_postfix(validation_loss = avg_validation_loss, training_loss = avg_training_loss, val_deviation =  np.std(batch_weights))   
         print("saving final scores",flush=True)
         self.save_scores(config_scores)
         return config_scores
@@ -84,7 +84,7 @@ class CrossValidationPipeline :
                 validation.append(avg_validation_loss)
                 training.append(avg_training_loss)
                 fold_weights.append(val_weights)
-                samples_iter.set_postfix(avg_training_loss = avg_training_loss, avg_validation_loss = avg_validation_loss, val_deviation = np.std(1.0/(len(val_weights)*1.0/avg_validation_loss*val_weights)))
+                samples_iter.set_postfix(avg_training_loss = avg_training_loss, avg_validation_loss = avg_validation_loss, val_deviation = np.std(val_weights))
         validation = np.array(validation)
         training = np.array(training)
         batch_weights = 1.0/validation
