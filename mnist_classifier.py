@@ -11,6 +11,7 @@ from search_strategy import GridSearch
 from validation import CrossValidationPipeline
 from datasets import ImageClassificationDataset
 from models import create_net, CustomNetClassification
+from model_blocks import DoubleConvLayer, InceptionLayer
 from loss import SupervisedMetricList, Accuracy, MarginLoss
 
 import torch
@@ -48,7 +49,8 @@ if __name__ == "__main__" :
                                  "input_dim" : 28,
                                  "final_conv_dim" : 8,
                                  "initial_channels" : 1,
-                                 "num_classes" : 10
+                                 "num_classes" : 10,
+                                 "conv_module" : [InceptionLayer,DoubleConvLayer]
                                  },
                     "loader" : {"batch_size" : 2000,
                                 "workers" : 4

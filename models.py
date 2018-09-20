@@ -66,11 +66,11 @@ class PreTrainedClassifier(nn.Module) :
         return self.model(inputs,mode)
    
 class CustomNetClassification(nn.Module):
-    def __init__(self,input_dim, final_conv_dim, initial_channels,growth_factor,num_classes) :
+    def __init__(self,input_dim, final_conv_dim, initial_channels,growth_factor,num_classes,conv_module) :
         super(CustomNetClassification,self).__init__()
         self.layer = nn.ModuleList()
         while input_dim >= final_conv_dim :
-            self.layer.append(nn.Sequential(DoubleConvLayer(initial_channels,initial_channels+growth_factor,3,1),
+            self.layer.append(nn.Sequential(conv_module(initial_channels,initial_channels+growth_factor),
                                             nn.MaxPool2d(kernel_size=3,stride=2,padding=1)))
             input_dim = input_dim//2
             initial_channels += growth_factor
