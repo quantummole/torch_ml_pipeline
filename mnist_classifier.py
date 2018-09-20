@@ -17,6 +17,7 @@ from loss import SupervisedMetricList, Accuracy, MarginLoss
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torchvision import transforms
 import pandas as pd
 import numpy as np
 
@@ -44,7 +45,9 @@ if __name__ == "__main__" :
                      "trainer" : Trainer,
                      "debugger" : Debugger
                      }
-    
+    train_transform = transforms.Compose([
+            transforms.RandomAffine(10,(0.2,0.2),shear=1)
+            ])
     params_space = {"network" : {"growth_factor" : [10,15,20],
                                  "input_dim" : 28,
                                  "final_conv_dim" : 8,
@@ -63,7 +66,7 @@ if __name__ == "__main__" :
                                    },
                     "constants" : {"val_best" : 10},
                     "data" : {"training_split" : 0.5,
-                              "train_dataset" : [[{"transform_sequence" : None}]],
+                              "train_dataset" : [{1 : { "transform_sequence" : train_transform}},{1 :{"transform_sequence" : None}}],
                               "val_dataset" : {"transform_sequence" : None},
                               },
                     "objectives" : {"loss_fn" : [([1],[SupervisedMetricList([[nn.CrossEntropyLoss(),MarginLoss(10)]],[[0.0,1.0]])]),([1],[SupervisedMetricList([[nn.CrossEntropyLoss(),MarginLoss(10)]],[[1.0,0.0]])]),([1],[SupervisedMetricList([[nn.CrossEntropyLoss(),MarginLoss(10)]],[[0.5,0.5]])])],

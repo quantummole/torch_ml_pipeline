@@ -111,7 +111,7 @@ class CrossValidationPipeline :
                     workers = params["loader"]["workers"]
 
                     val_dataset = self.dataset(validation_data,mode=0,**params["data"].get("val_dataset",{}))
-                    train_datasets = [self.dataset(train_data,mode=mode,**params["data"].get("train_dataset",[{}]*(mode))[mode-1]) for mode in modes]
+                    train_datasets = [self.dataset(train_data,mode=mode,**params["data"].get("train_dataset",{mode : {}})[mode]) for mode in modes]
 
                     val_dataloader = data.DataLoader(val_dataset,np.int(1.5*batch_size),num_workers = workers)
                     train_dataloaders = [data.DataLoader(train_dataset,batch_size,shuffle=True,num_workers = workers) for train_dataset in train_datasets]

@@ -15,7 +15,7 @@ class SupervisedMetricList :
         num_outputs = len(predictions)
         for i in range(num_outputs) :
             for j in range(len(self.objective_fn[i])) :
-                loss +=  self.weights[i][j]*self.objective_fn[i][j](predictions[i],labels[i].type(torch.cuda.LongTensor))/num_outputs
+                loss +=  self.weights[i][j]*self.objective_fn[i][j](predictions[i],labels[i])/num_outputs
         return loss
  
 class SiameseLossList :
