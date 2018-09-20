@@ -10,13 +10,14 @@ import torch
 from tqdm import tqdm, trange
 
 class Trainer :
-    def __init__(self,network,device,optimizer,scheduler,train_dataloaders,val_dataloader,loss_fns,score_fn,model_file) :
+    def __init__(self,network,device,optimizer,scheduler,train_dataloaders,val_dataloader,modes,loss_fns,score_fn,model_file) :
         self.network = network
         self.device = device
         self.train_dataloaders = train_dataloaders
         self.val_dataloader = val_dataloader
         self.optimizer_class = optimizer
         self.scheduler_class = scheduler
+        self.modes = modes
         self.loss_fns = loss_fns
         self.score_fn = score_fn
         self.model_file = model_file
@@ -63,8 +64,8 @@ class Trainer :
                 if issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
                     self.scheduler.step()
                 train_loss = []
-                for mode in range(len(self.loss_fns)) :
-                    train_loss.append(self.train(mode+1))
+                for mode in self.modes :
+                    train_loss.append(self.train(mode))
                 val_loss = self.validate()
                 if not issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
                     self.scheduler.step(val_loss)

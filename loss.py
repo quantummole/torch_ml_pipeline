@@ -6,16 +6,16 @@ Created on Thu Sep 13 22:05:55 2018
 """
 import torch 
 
-class ClassificationLossList :
-    def __init__(self,list_list_loss_fn,weights) :
-        self.loss_fn = list_list_loss_fn
+class SupervisedMetricList :
+    def __init__(self,list_list_objective_fn,weights) :
+        self.objective_fn = list_list_objective_fn
         self.weights = weights
     def __call__(self,predictions,labels):
         loss = 0
         num_outputs = len(predictions)
         for i in range(num_outputs) :
-            for j in range(len(self.loss_fn[i])) :
-                loss +=  self.weights[i][j]*self.loss_fn[i][j](predictions[i],labels[i].type(torch.cuda.LongTensor))/num_outputs
+            for j in range(len(self.objective_fn[i])) :
+                loss +=  self.weights[i][j]*self.objective_fn[i][j](predictions[i],labels[i].type(torch.cuda.LongTensor))/num_outputs
         return loss
  
 class SiameseLossList :

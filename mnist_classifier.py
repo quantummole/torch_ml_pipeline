@@ -11,7 +11,7 @@ from search_strategy import GridSearch
 from validation import CrossValidationPipeline
 from datasets import ImageClassificationDataset
 from models import create_net, CustomNetClassification
-from loss import ClassificationLossList, Accuracy, MarginLoss
+from loss import SupervisedMetricList, Accuracy, MarginLoss
 
 import torch
 import torch.nn as nn
@@ -64,8 +64,8 @@ if __name__ == "__main__" :
                               "train_dataset" : [[{"transform_sequence" : None}]],
                               "val_dataset" : {"transform_sequence" : None},
                               },
-                    "objectives" : {"loss_fn" : [[ClassificationLossList([[nn.CrossEntropyLoss(),MarginLoss(10)]],[[0.0,1.0]])]],
-                                    "score_fn" : ClassificationLossList([[Accuracy()]],[[1.0]])
+                    "objectives" : {"loss_fn" : [([1],[SupervisedMetricList([[nn.CrossEntropyLoss(),MarginLoss(10)]],[[0.0,1.0]])]),([1],[SupervisedMetricList([[nn.CrossEntropyLoss(),MarginLoss(10)]],[[1.0,0.0]])]),([1],[SupervisedMetricList([[nn.CrossEntropyLoss(),MarginLoss(10)]],[[0.5,0.5]])])],
+                                    "score_fn" : SupervisedMetricList([[Accuracy()]],[[1.0]])
                                     },
                     "fold_options" : {"group_keys" : [["label"]]},
                     "bootstrap_options" : {"group_keys" : [["label"]],

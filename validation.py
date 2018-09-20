@@ -24,7 +24,7 @@ class CrossValidationPipeline :
         self.dataset = config_params["dataset"]
         self.Trainer = config_params["trainer"]
         self.Debugger = config_params["debugger"]
-
+        
         self.model_dir = config_params["model_dir"]+"/models"
         self.model_file = self.model_dir+"/model_{}_{}_{}.mod"
         self.debug_dir = config_params["model_dir"]+"/debug/"
@@ -32,7 +32,8 @@ class CrossValidationPipeline :
         self.config_file = self.config_dir+"/config_{}.pkl"
         self.inference_dir = config_params["model_dir"]+"/inference/"
         self.score_file = config_params["model_dir"]+"/score.pkl"
-        self.get_model_file = lambda a : lambda b : lambda c : self.model_file.format(a,b,c)
+
+        self.get_model_file = lambda config_id : lambda sample_id : lambda fold_id : self.model_file.format(config_id,sample_id,fold_id)
 
     def get_params(self,config_id) :
         file = open(self.config_file.format(config_id), 'rb')
@@ -104,18 +105,18 @@ class CrossValidationPipeline :
                 for fold in fold_iter :
                     val_best = params["constants"]["val_best"]
                     train_data,validation_data = sampler(fold)
-                    loss_fn = params["objectives"]["loss_fn"]
+                    modes,loss_fns = params["objectives"]["loss_fn"]
                     score_fn = params["objectives"]["score_fn"]
                     batch_size = params["loader"]["batch_size"]
                     workers = params["loader"]["workers"]
 
                     val_dataset = self.dataset(validation_data,mode=0,**params["data"].get("val_dataset",{}))
-                    train_datasets = [self.dataset(train_data,mode=i+1,**params["data"].get("train_dataset",[{}]*(i+1))[i]) for i in range(len(loss_fn))]
+                    train_datasets = [self.dataset(train_data,mode=mode,**params["data"].get("train_dataset",[{}]*(mode))[mode-1]) for mode in modes]
 
                     val_dataloader = data.DataLoader(val_dataset,np.int(1.5*batch_size),num_workers = workers)
                     train_dataloaders = [data.DataLoader(train_dataset,batch_size,shuffle=True,num_workers = workers) for train_dataset in train_datasets]
 
-                    trainer = self.Trainer(self.network,self.device,self.optimizer,self.scheduler,train_dataloaders,val_dataloader,loss_fn,score_fn,model_file(fold))
+                    trainer = self.Trainer(self.network,self.device,self.optimizer,self.scheduler,train_dataloaders,val_dataloader,modes,loss_fns,score_fn,model_file(fold))
                     fold_training,fold_validation = trainer.fit(params["network"],params["optimizer"],params["scheduler"],max_epochs,val_best)
                     validation_scores.append(fold_validation)
                     training_scores.append(fold_training)
