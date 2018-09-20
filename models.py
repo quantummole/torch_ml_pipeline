@@ -35,7 +35,7 @@ class DensenetModels(nn.Module) :
         for inp in inputs :
             if len(inp.shape) == 3 :
                 bs,m,n = inp.shape
-                inp = inp.view(bs,3,m,n)
+                inp = torch.stack([inp,inp,inp],dim=1)
             outputs.append(self.model(inputs))
         return outputs
 
@@ -52,7 +52,7 @@ class ResnetModels(nn.Module) :
         for inp in inputs :
             if len(inp.shape) == 3 :
                 bs,m,n = inp.shape
-                inp = inp.view(bs,3,m,n)
+                inp = torch.stack([inp,inp,inp],dim=1)
             outputs.append(self.model(inputs))
         return outputs
 
