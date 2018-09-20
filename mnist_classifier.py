@@ -5,13 +5,13 @@ Created on Wed Sep 12 22:01:16 2018
 @author: quantummole
 """
 from trainer import Trainer, Debugger
-from fold_strategy import ShuffleFoldGroups
+from fold_strategy import StratifiedDeterministicFold
 from bootstrap_strategy import OverSample
 from search_strategy import GridSearch
 from validation import CrossValidationPipeline
 from datasets import ImageClassificationDataset
 from models import create_net, CustomNetClassification
-from loss import ClassificationLossList, Accuracy
+from loss import ClassificationLossList, Accuracy, MarginLoss
 
 import torch
 import torch.nn as nn
@@ -37,7 +37,7 @@ if __name__ == "__main__" :
                      "model_dir" : "./models/mnist_classifier",
                      "device" : torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                      "dataset" :ImageClassificationDataset,
-                     "fold_strategy" : ShuffleFoldGroups,
+                     "fold_strategy" : StratifiedDeterministicFold,
                      "search_strategy" : GridSearch,
                      "bootstrap_strategy" : OverSample,
                      "trainer" : Trainer,
@@ -64,7 +64,7 @@ if __name__ == "__main__" :
                               "train_dataset" : [[{"transform_sequence" : None}]],
                               "val_dataset" : {"transform_sequence" : None},
                               },
-                    "objectives" : {"loss_fn" : [[ClassificationLossList([[nn.CrossEntropyLoss()]],[[1.0]])]],
+                    "objectives" : {"loss_fn" : [[ClassificationLossList([[nn.CrossEntropyLoss(),MarginLoss(10)]],[[0.0,1.0]])]],
                                     "score_fn" : ClassificationLossList([[Accuracy()]],[[1.0]])
                                     },
                     "fold_options" : {"group_keys" : [["label"]]},
@@ -87,4 +87,4 @@ if __name__ == "__main__" :
     image_files = [PATH+"/img_"+i+".jpg" for i in image_ids]
     test_dataset = np.hstack([np.array(image_ids).reshape(-1,1),np.array(image_files).reshape(-1,1)])
     test_dataset = pd.DataFrame(test_dataset,columns=["id","path"])
-    scheme.debug([test_dataset,dataset],["test_scores","train_scores"],debug_fn)
+    scheme.infer([test_dataset,dataset],["test_scores","train_scores"],debug_fn)

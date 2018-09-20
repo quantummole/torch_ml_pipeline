@@ -6,12 +6,8 @@ Created on Mon Sep 10 11:02:42 2018
 """
 
 
-import random
 import numpy as np
-import pickle
-import torch
-from torch.utils import data
-
+import pandas as pd
 
 class Fold(object):
     def __init__(self,dataset,training_split):
@@ -51,9 +47,35 @@ class DeterministicFold(Fold) :
         train_data = self.dataset.drop(validation_data.index)
         return train_data,validation_data
 
-class ShuffleFoldGroups(Fold) :
+class StratifiedDeterministicFold(Fold) :
     def __init__(self,dataset,training_split,group_keys) :
-        super(ShuffleFoldGroups,self).__init__(dataset,training_split)
+        super(StratifiedDeterministicFold,self).__init__(dataset,training_split)
+        self.group_keys = group_keys
+        self.folds = []
+        curr_indices = []
+        curr_dataset = self.dataset
+        for i in range(0,self.dataset.shape[0],self.validation_samples) :
+            pruned_dataset = curr_dataset.drop(curr_indices)
+            dataset_groups = pruned_dataset.groupby(self.group_keys,as_index=False,group_keys=False)
+            dataset_group_names = dataset_groups.groups.keys()
+            dataset_group_lengths = [len(dataset_groups.get_group(key)) for key in dataset_group_names]
+            sample_group_lengths = [np.int(np.ceil(x*self.validation_split)) for x in dataset_group_lengths]
+            fold = []
+            for i,key in enumerate(dataset_group_names) :
+                fold.append(dataset_groups.get_group(key).sample(n=min([dataset_group_lengths[i],sample_group_lengths[i]])))
+            fold = pd.concat(fold)
+            self.folds.append(fold)
+            curr_indices = self.folds[-1].index
+            curr_dataset = pruned_dataset
+        self.num_folds = len(self.folds)
+    def __call__(self,fold_num) :
+        validation_data = self.folds[fold_num]
+        train_data = self.dataset.drop(validation_data.index)
+        return train_data,validation_data
+    
+class StratifiedShuffleFold(Fold) :
+    def __init__(self,dataset,training_split,group_keys) :
+        super(StratifiedShuffleFold,self).__init__(dataset,training_split)
         self.group_keys = group_keys
     def __call__(self,fold_num) :
         orig_index_length = self.dataset.index[0]

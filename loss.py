@@ -38,3 +38,14 @@ class Accuracy :
     def __call__(self,predictions,labels) :
         _,vals = torch.max(predictions,dim=1)
         return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))
+
+class MarginLoss :
+    def __init__(self,num_classes) : 
+        self.num_classes = num_classes
+    def __call__(self,predictions,labels) :
+        one_hot = torch.zeros_like(predictions)
+        one_hot = one_hot.scatter(dim=1,index=labels.view(-1,1),source=1)
+        values = torch.sum(one_hot*predictions,dim=1,keepdim=True)
+        prediction_margins = predictions-values
+        loss  = torch.mean(torch.log(torch.sum(torch.exp(prediction_margins),dim=1)))
+        return loss

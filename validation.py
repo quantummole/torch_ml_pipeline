@@ -30,6 +30,7 @@ class CrossValidationPipeline :
         self.debug_dir = config_params["model_dir"]+"/debug/"
         self.config_dir = config_params["model_dir"]+"/configs"
         self.config_file = self.config_dir+"/config_{}.pkl"
+        self.inference_dir = config_params["model_dir"]+"/inference/"
         self.score_file = config_params["model_dir"]+"/score.pkl"
         self.get_model_file = lambda a : lambda b : lambda c : self.model_file.format(a,b,c)
 
@@ -128,7 +129,7 @@ class CrossValidationPipeline :
             avg_training_loss = np.mean(training[range(num_folds),indices],axis=0)
             return avg_training_loss,avg_validation_loss,val_weights
     
-    def debug(self,datasets,dataset_ids,debug_fn) :
+    def infer(self,datasets,dataset_ids,inference_fn,debug_fn = None) :
         config_scores = self.get_scores()
         config_ids = config_scores.keys()
         print("initializing ensemble weights across configurations",flush=True)
@@ -146,10 +147,10 @@ class CrossValidationPipeline :
         weights = np.array(weights)
         weights = weights/np.sum(weights)
         print("Initiializing Debug Module",flush=True)
-        debugger = self.Debugger(self.network,self.device,ensemble,weights,self.debug_dir,debug_fn)
+        debugger = self.Debugger(self.network,self.device,ensemble,weights,self.inference_dir,inference_fn,self.debug_dir,debug_fn)
         with tqdm(datasets,desc="Datasets") as datasets_ :
             for i_data, dataset in enumerate(datasets_):
                 datasets_.set_postfix(dataset_id=dataset_ids[i_data])
                 debug_dataset = self.dataset(dataset,mode=-1,**params["data"].get("val_dataset",{}))
                 dataloader = data.DataLoader(debug_dataset,batch_size=batch_size,num_workers = workers)
-                debugger.debug(dataloader,dataset_ids[i_data])
+                debugger.infer(dataloader,dataset_ids[i_data])

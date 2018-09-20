@@ -80,14 +80,17 @@ class Trainer :
         
     
 class Debugger :
-    def __init__(self,network,device,ensemble_configs,weights,debug_dir,debug_fn) :
+    def __init__(self,network,device,ensemble_configs,weights,inference_dir,inference_fn,debug_dir,debug_fn) :
         self.ensemble = [network(**config) for config in ensemble_configs]
         self.weights = weights
+        self.inference_fn = inference_fn
         self.debug_fn = debug_fn
         self.device = device
         self.debug_dir = debug_dir
+        self.inference_dir = inference_dir
         
-    def debug(self,dataloader,data_id) :
+        
+    def infer(self,dataloader,data_id) :
         def collate(outputs) :
             num_outputs = len(outputs[0])
             final_outputs = []
@@ -114,4 +117,18 @@ class Debugger :
                         net = net.cpu()
                         torch.cuda.empty_cache()
                     outputs = collate(outputs)
-                    self.debug_fn(self.debug_dir,data_id,debug_info,outputs,ground_truths)
+                    self.inference_fn(self.inference_dir,data_id,debug_info,outputs,ground_truths)
+
+    def debug(self,dataloader,data_id,model_id) :
+        with torch.no_grad():
+            with tqdm(dataloader,desc="Batches",leave=False) as loader :
+                for i_batch,sample_batch in enumerate(loader) :
+                    inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
+                    ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                    debug_info = sample_batch['debug_info']
+                    net = self.ensemble[model_id].to(self.device)
+                    net.eval()
+                    net_outputs = net(inputs,mode=-2)
+                    net = net.cpu()
+                    torch.cuda.empty_cache()
+                    self.debug_fn(self.debug_dir,data_id,debug_info,net_outputs,ground_truths)
