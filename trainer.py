@@ -30,9 +30,10 @@ class Trainer :
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                 self.optimizer.zero_grad()
                 outputs = self.net(inputs,mode)
-                loss = self.Evaluator.compute(mode,outputs,ground_truths)
+                loss = self.Evaluator.get_objective(mode)(outputs,ground_truths)
                 loss.backward()
                 self.optimizer.step()
+                self.Evaluator.log(mode,[output.detach.cpu().numpy() for output in outputs],[gt.detach.cpu().numpy() for gt in ground_truths])
                 loss_value += loss.detach().item()
                 loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode)
         return loss_value/(i_batch+1)
