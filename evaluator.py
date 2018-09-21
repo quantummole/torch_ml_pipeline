@@ -14,6 +14,5 @@ class Evaluator:
     def log(self,mode,outputs,targets) :
         pass
     
-    def compute(self,mode,outputs,targets) :
-        self.log(mode,outputs,targets)
-        return self.objective_fns[mode](outputs,targets)
+    def get(self,mode) :
+        return self.objective_fns[mode]
