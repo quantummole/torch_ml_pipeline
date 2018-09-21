@@ -24,7 +24,7 @@ class DoubleConvLayer(nn.Module) :
 class InceptionLayer(nn.Module) :
     def __init__(self,in_channels,out_channels,kernel_sizes = [1,3,5]) :
         super(InceptionLayer,self).__init__()
-        intermed_channels = 2*out_channels
+        intermed_channels = out_channels
         self.layers = nn.ModuleList()
         for ksize in kernel_sizes :
             self.layers.append(nn.Sequential(nn.Conv2d(in_channels,intermed_channels,kernel_size = ksize,padding=ksize//2),

@@ -24,6 +24,7 @@ class CrossValidationPipeline :
         self.dataset = config_params["dataset"]
         self.Trainer = config_params["trainer"]
         self.Debugger = config_params["debugger"]
+        self.Evaluator = config_params["evaluator"]
         
         self.model_dir = config_params["model_dir"]+"/models"
         self.model_file = self.model_dir+"/model_{}_{}_{}.mod"
@@ -32,7 +33,8 @@ class CrossValidationPipeline :
         self.config_file = self.config_dir+"/config_{}.pkl"
         self.inference_dir = config_params["model_dir"]+"/inference/"
         self.score_file = config_params["model_dir"]+"/score.pkl"
-
+        
+        self.get_evaluation_id = lambda config_id : lambda sample_id : lambda fold_id : "{}_{}_{}".format(config_id,sample_id,fold_id)
         self.get_model_file = lambda config_id : lambda sample_id : lambda fold_id : self.model_file.format(config_id,sample_id,fold_id)
 
     def get_params(self,config_id) :
@@ -61,7 +63,7 @@ class CrossValidationPipeline :
         with trange(num_configs,desc="Configs") as config_iter :
             for config_batch in config_iter :
                 config_id,params = searcher()
-                avg_training_loss,avg_validation_loss,batch_weights,fold_weights = self.bootstrap_validation(params,dataset,max_epochs,self.get_model_file(config_id))
+                avg_training_loss,avg_validation_loss,batch_weights,fold_weights = self.bootstrap_validation(params,dataset,max_epochs,self.get_model_file(config_id),self.get_evaluation_id(config_id))
                 searcher.tune(avg_validation_loss)
                 config_scores[config_id] = {"stats" :[avg_training_loss,avg_validation_loss],
                                              "batch_weights" : batch_weights,
@@ -73,7 +75,7 @@ class CrossValidationPipeline :
         self.save_scores(config_scores)
         return config_scores
 
-    def bootstrap_validation(self,params,dataset,max_epochs,model_file) :
+    def bootstrap_validation(self,params,dataset,max_epochs,model_file,eval_id) :
         bootstrapper = self.bootstrap(dataset,**params.get("bootstrap_options",{}))
         num_samples = bootstrapper.num_samples
         validation = []
@@ -82,7 +84,7 @@ class CrossValidationPipeline :
         with trange(num_samples,desc="Bootstrap Samples") as samples_iter :
             for sample_id in samples_iter :
                 subset = bootstrapper.sample(sample_id)
-                avg_training_loss,avg_validation_loss,val_weights = self.cross_validate(params,subset,max_epochs,model_file(sample_id))
+                avg_training_loss,avg_validation_loss,val_weights = self.cross_validate(params,subset,max_epochs,model_file(sample_id),eval_id(sample_id))
                 validation.append(avg_validation_loss)
                 training.append(avg_training_loss)
                 fold_weights.append(val_weights)
@@ -95,7 +97,7 @@ class CrossValidationPipeline :
         avg_training_loss = np.mean(training,axis=0)
         return avg_training_loss,avg_validation_loss,batch_weights,fold_weights        
 
-    def cross_validate(self,params,dataset,max_epochs,model_file) :
+    def cross_validate(self,params,dataset,max_epochs,model_file,eval_id) :
             training_split = params["data"]["training_split"]
             sampler = self.fold_strategy(dataset,training_split,**params.get("fold_options",{}))
             num_folds = sampler.num_folds
@@ -109,14 +111,15 @@ class CrossValidationPipeline :
                     score_fn = params["objectives"]["score_fn"]
                     batch_size = params["loader"]["batch_size"]
                     workers = params["loader"]["workers"]
-
+                    objective_fns = dict(zip([0]+modes,[score_fn]+loss_fns))
+                    evaluator = self.Evaluator(self.debug_dir,eval_id(fold),objective_fns)
                     val_dataset = self.dataset(validation_data,mode=0,**params["data"].get("val_dataset",{}))
                     train_datasets = [self.dataset(train_data,mode=mode,**params["data"].get("train_dataset",{mode : {}})[mode]) for mode in modes]
 
                     val_dataloader = data.DataLoader(val_dataset,np.int(1.5*batch_size),num_workers = workers)
                     train_dataloaders = [data.DataLoader(train_dataset,batch_size,shuffle=True,num_workers = workers) for train_dataset in train_datasets]
 
-                    trainer = self.Trainer(self.network,self.device,self.optimizer,self.scheduler,train_dataloaders,val_dataloader,modes,loss_fns,score_fn,model_file(fold))
+                    trainer = self.Trainer(self.network,self.device,self.optimizer,self.scheduler,train_dataloaders,val_dataloader,modes,evaluator,model_file(fold))
                     fold_training,fold_validation = trainer.fit(params["network"],params["optimizer"],params["scheduler"],max_epochs,val_best)
                     validation_scores.append(fold_validation)
                     training_scores.append(fold_training)

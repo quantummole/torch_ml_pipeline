@@ -10,7 +10,7 @@ import torch
 from tqdm import tqdm, trange
 
 class Trainer :
-    def __init__(self,network,device,optimizer,scheduler,train_dataloaders,val_dataloader,modes,loss_fns,score_fn,model_file) :
+    def __init__(self,network,device,optimizer,scheduler,train_dataloaders,val_dataloader,modes,evaluator,model_file) :
         self.network = network
         self.device = device
         self.train_dataloaders = train_dataloaders
@@ -18,8 +18,7 @@ class Trainer :
         self.optimizer_class = optimizer
         self.scheduler_class = scheduler
         self.modes = modes
-        self.loss_fns = loss_fns
-        self.score_fn = score_fn
+        self.Evaluator = evaluator
         self.model_file = model_file
 
     def train(self,mode) :
@@ -31,7 +30,7 @@ class Trainer :
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                 self.optimizer.zero_grad()
                 outputs = self.net(inputs,mode)
-                loss = self.loss_fns[mode-1](outputs,ground_truths)
+                loss = self.Evaluator.compute(mode,outputs,ground_truths)
                 loss.backward()
                 self.optimizer.step()
                 loss_value += loss.detach().item()
@@ -47,7 +46,7 @@ class Trainer :
                     inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                     outputs = self.net(inputs,mode=0)
-                    score += self.score_fn(outputs,ground_truths).item()
+                    score += self.Evaluator.compute(0,outputs,ground_truths).item()
                     loader.set_postfix(score=(score/(i_batch+1)))
                 score = score/(i_batch+1)
             return score

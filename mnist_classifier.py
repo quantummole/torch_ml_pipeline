@@ -13,6 +13,7 @@ from datasets import ImageClassificationDataset
 from models import create_net, CustomNetClassification
 from model_blocks import DoubleConvLayer, InceptionLayer
 from loss import SupervisedMetricList, Accuracy, MarginLoss
+from evaluator import Evaluator
 
 import torch
 import torch.nn as nn
@@ -43,7 +44,8 @@ if __name__ == "__main__" :
                      "search_strategy" : GridSearch,
                      "bootstrap_strategy" : OverSample,
                      "trainer" : Trainer,
-                     "debugger" : Debugger
+                     "debugger" : Debugger,
+                     "evaluator" : Evaluator
                      }
     train_transform = transforms.Compose([
             transforms.RandomAffine(10,(0.2,0.2),shear=1)
@@ -55,7 +57,7 @@ if __name__ == "__main__" :
                                  "num_classes" : 10,
                                  "conv_module" : [InceptionLayer,DoubleConvLayer]
                                  },
-                    "loader" : {"batch_size" : 2000,
+                    "loader" : {"batch_size" : 1000,
                                 "workers" : 4
                                 },
                     "optimizer" : {"lr" : 1e-3,
