@@ -9,13 +9,31 @@ from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
 from skimage import io
-import pydicom
 from PIL import Image
 import torchvision.datasets as datasets
 
 #mode = -1 is for test and debug
 #mode = 0 is for validation
 #mode = {1,2,3..} is for training
+
+from signals import Signal
+class DatasetGenerator :
+    def __init__(self,dataset_class,dataset_class_params,name = "DatasetGenerator") :
+        self.name = name
+        self.dataset_class = dataset_class
+        self.dataset_class_params = dataset_class_params
+    def __call__(self,inputs) :
+        modes = inputs["execution_modes"]
+        inputs["torch_dataset"] = inputs.get("torch_dataset",{})
+        for mode in modes :
+            if mode > 0 :
+                dataset = inputs["train_dataset"]
+            elif mode == 0 :
+                dataset == inputs["validation_dataset"]
+            else :
+                dataset = inputs["dataset"]
+            inputs["torch_dataset"] = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params)
+        return Signal.COMPLETE,' '.join([str(i) for i in modes]),inputs
 
 class ImageClassificationDataset(Dataset) :
     def __init__(self,data,mode = -1,transform_sequence = None) :

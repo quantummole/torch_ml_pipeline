@@ -10,9 +10,8 @@ import hashlib
 import random
 from functools import reduce 
 class Search(object) :
-    def __init__(self,params_space,config_file) :
+    def __init__(self,params_space) :
         self.params_space = params_space
-        self.config_file = config_file
         self.param_grid  = [len(self.params_space[key][value]) if isinstance(self.params_space[key][value],list) else 1 for key in self.params_space.keys() for value in self.params_space[key].keys()]
         self.max_configs = reduce(lambda x, y: x*y, self.param_grid)
         self.curr_state = None
@@ -44,14 +43,14 @@ class Search(object) :
                 params[method][key] = value
                 counter += 1
         config_id = self.generate_config_id(params)
-        self.store_config(config_id,params)
+#        self.store_config(config_id,params)
         return config_id,params
     def tune(self,val_score) :
         raise NotImplementedError
 
 class GridSearch(Search) :
-    def __init__(self,params_space,config_file) :
-        super(GridSearch,self).__init__(params_space,config_file)
+    def __init__(self,params_space) :
+        super(GridSearch,self).__init__(params_space)
         self.param_keys = self.params_space.keys()
         self.param_names_grid = [[value for value in self.params_space[key]] for key in self.param_keys] 
         self.curr_state = [0  for l  in self.param_grid]
@@ -69,8 +68,9 @@ class GridSearch(Search) :
         pass
 
 class RandomSearch(Search) :
-    def __init__(self,params_space,config_file) :
+    def __init__(self,params_space,config_file,num_configs) :
         super(RandomSearch,self).__init__(params_space,config_file) 
+        self.max_configs = num_configs
     def get_next_state(self,curr_state,max_grid) :
         return [random.randint(0,i-1) for i in max_grid]
     def tune(self,val_score) :

@@ -28,12 +28,13 @@ class Trainer :
             for i_batch,sample_batch in enumerate(loader) :
                 inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                debug_info = sample_batch['debug_info']
                 self.optimizer.zero_grad()
                 outputs = self.net(inputs,mode)
                 loss = self.Evaluator.get_objective(mode)(outputs,ground_truths)
                 loss.backward()
                 self.optimizer.step()
-                self.Evaluator.log(mode,[output.detach.cpu().numpy() for output in outputs],[gt.detach.cpu().numpy() for gt in ground_truths])
+                self.Evaluator.log(mode,[output.detach().cpu().numpy() for output in outputs],[gt.detach().cpu().numpy() for gt in ground_truths],debug_info)
                 loss_value += loss.detach().item()
                 loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode)
         return loss_value/(i_batch+1)
@@ -46,8 +47,10 @@ class Trainer :
                 for i_batch,sample_batch in enumerate(loader) :
                     inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                    debug_info = sample_batch['debug_info']
                     outputs = self.net(inputs,mode=0)
-                    score += self.Evaluator.compute(0,outputs,ground_truths).item()
+                    score += self.Evaluator.get_objective(0)(outputs,ground_truths).item()
+                    self.Evaluator.log(0,[output.detach().cpu().numpy() for output in outputs],[gt.detach().cpu().numpy() for gt in ground_truths],debug_info)
                     loader.set_postfix(score=(score/(i_batch+1)))
                 score = score/(i_batch+1)
             return score
