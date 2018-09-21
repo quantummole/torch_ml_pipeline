@@ -32,6 +32,7 @@ class CrossValidationPipeline :
         self.config_dir = config_params["model_dir"]+"/configs"
         self.config_file = self.config_dir+"/config_{}.pkl"
         self.inference_dir = config_params["model_dir"]+"/inference/"
+        self.metrics_dir = config_params["metrics_dir"]+"/metrics/"
         self.score_file = config_params["model_dir"]+"/score.pkl"
         
         self.get_evaluation_id = lambda config_id : lambda sample_id : lambda fold_id : "{}_{}_{}".format(config_id,sample_id,fold_id)
@@ -112,7 +113,7 @@ class CrossValidationPipeline :
                     batch_size = params["loader"]["batch_size"]
                     workers = params["loader"]["workers"]
                     objective_fns = dict(zip([0]+modes,[score_fn]+loss_fns))
-                    evaluator = self.Evaluator(self.debug_dir,eval_id(fold),objective_fns)
+                    evaluator = self.Evaluator(self.metrics_dir,eval_id(fold),objective_fns)
                     val_dataset = self.dataset(validation_data,mode=0,**params["data"].get("val_dataset",{}))
                     train_datasets = [self.dataset(train_data,mode=mode,**params["data"].get("train_dataset",{mode : {}})[mode]) for mode in modes]
 
