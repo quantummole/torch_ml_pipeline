@@ -43,6 +43,6 @@ class Evaluator:
         file.close()
     def log(self,mode,outputs,targets,debug_info) :
         if mode == "inference" :
-            self.inference_fn(self.inference_file,outputs,targets,debug_info)
+            self.inference_fn(self.get_inference_file(),outputs,targets,debug_info)
     def log_score(self,run_id,score) :
         pass
