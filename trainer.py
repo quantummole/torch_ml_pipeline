@@ -7,59 +7,67 @@ Created on Mon Sep 10 11:02:42 2018
 
 
 import torch
+from torch.autograd import Variable
+import numpy as np
 from tqdm import tqdm, trange
+from signals import Signal
 
 class Trainer :
-    def __init__(self,network,device,optimizer,scheduler,train_dataloaders,val_dataloader,modes,evaluator,model_file) :
+    def __init__(self,network,network_params,optimizer,optimizer_params,scheduler,scheduler_params,modes,evaluator,max_epochs,objective_fns,val_max_score=1e+5) :
         self.network = network
-        self.device = device
-        self.train_dataloaders = train_dataloaders
-        self.val_dataloader = val_dataloader
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.optimizer_class = optimizer
         self.scheduler_class = scheduler
         self.modes = modes
         self.Evaluator = evaluator
-        self.model_file = model_file
-
+        self.model_file = self.Evaluator.model_file
+        self.net = self.network(network_params).to(self.device)
+        self.optimizer = self.optimizer_class(self.net.parameters(),**optimizer_params)
+        self.scheduler = self.scheduler_class(self.optimizer,**scheduler_params)
+        self.max_epochs = max_epochs
+        self.objective_fns = objective_fns
+        self.val_max_score = val_max_score
     def train(self,mode) :
         self.net.train()
         loss_value = 0
-        with tqdm(self.train_dataloaders[mode-1],desc = "Training Epoch",leave=False) as loader :
+        grads = []
+        with tqdm(self.dataloaders[mode],desc = "Training Epoch") as loader :
             for i_batch,sample_batch in enumerate(loader) :
-                inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
+                inputs = [Variable(inp.to(self.device), requires_grad=True) for inp in sample_batch['inputs']]
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                debug_info = sample_batch['debug_info']
                 self.optimizer.zero_grad()
                 outputs = self.net(inputs,mode)
-                loss = self.Evaluator.get_objective(mode)(outputs,ground_truths)
+                loss = self.objective_fns[mode](outputs,ground_truths)
                 loss.backward()
+                grads.append(torch.abs(inputs[0].grad).mean().item())
                 self.optimizer.step()
-                self.Evaluator.log(mode,[output.detach.cpu().numpy() for output in outputs],[gt.detach.cpu().numpy() for gt in ground_truths])
+                self.Evaluator.log(mode,[output.detach().cpu().numpy() for output in outputs],[gt.detach().cpu().numpy() for gt in ground_truths],debug_info)
                 loss_value += loss.detach().item()
-                loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode)
+                loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode, mean_grad = np.mean(grads))
         return loss_value/(i_batch+1)
             
     def validate(self) :
         with torch.no_grad():
             self.net.eval()
             score = 0
-            with tqdm(self.val_dataloader,desc="Evaluation Epoch",leave=False) as loader :
+            with tqdm(self.dataloaders[0],desc="Evaluation Epoch") as loader :
                 for i_batch,sample_batch in enumerate(loader) :
                     inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                    debug_info = sample_batch['debug_info']
                     outputs = self.net(inputs,mode=0)
-                    score += self.Evaluator.compute(0,outputs,ground_truths).item()
+                    score += self.objective_fns[0](outputs,ground_truths).item()
+                    self.Evaluator.log(0,[output.detach().cpu().numpy() for output in outputs],[gt.detach().cpu().numpy() for gt in ground_truths],debug_info)
                     loader.set_postfix(score=(score/(i_batch+1)))
                 score = score/(i_batch+1)
             return score
 
-    def fit(self,net_params,optimizer_params,scheduler_params,max_epochs,best_val_loss) :
+    def execute(self,dataloaders) :
         epoch_validations = []
         epoch_trainings = []
-        self.net = self.network(net_params).to(self.device)
-        self.optimizer = self.optimizer_class(self.net.parameters(),**optimizer_params)
-        self.scheduler = self.scheduler_class(self.optimizer,**scheduler_params)
-
-        with trange(max_epochs,desc="Epochs",leave=False) as epoch_iters :
+        self.dataloaders = dataloaders
+        with trange(self.max_epochs,desc="Epochs") as epoch_iters :
             for epoch in epoch_iters :
                 if issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
                     self.scheduler.step()
@@ -71,13 +79,13 @@ class Trainer :
                     self.scheduler.step(val_loss)
                 epoch_validations.append(val_loss)
                 epoch_trainings.append(train_loss)
-                if best_val_loss >= val_loss :
+                if self.val_max_score >= val_loss :
                     best_val_loss = val_loss
                     torch.save(self.net.state_dict(),self.model_file)
-                epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss )
+                epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss,lr = self.scheduler.get_lr() )
         del self.net
         torch.cuda.empty_cache()
-        return epoch_trainings,epoch_validations
+        return Signal.COMPLETE,"complete",[epoch_trainings,epoch_validations]
         
     
 class Debugger :

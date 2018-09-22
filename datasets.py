@@ -5,17 +5,39 @@ Created on Mon Sep 10 11:02:42 2018
 @author: quantummole
 """
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, dataloader
 import pandas as pd
 import numpy as np
 from skimage import io
-import pydicom
 from PIL import Image
 import torchvision.datasets as datasets
+
 
 #mode = -1 is for test and debug
 #mode = 0 is for validation
 #mode = {1,2,3..} is for training
+
+from signals import Signal
+class DatasetGenerator :
+    def __init__(self,execution_modes,dataset_class,dataset_class_params,loader_options) :
+        self.dataset_class = dataset_class
+        self.dataset_class_params = dataset_class_params
+        self.loader_options = loader_options
+        self.modes = execution_modes
+    def execute(self,dataloaders=None,train_dataset=None,val_dataset=None,dataset=None) :
+        if dataloaders == None :
+            dataloaders = {}
+        for mode in self.modes :
+            if mode > 0 :
+                dataset = train_dataset
+            elif mode == 0 :
+                dataset = val_dataset
+            else :
+                dataset = dataset
+            dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params[mode])
+            dataset = dataloader.DataLoader(dataset,**self.loader_options)
+            dataloaders[mode] = dataset
+        return Signal.COMPLETE,'#'.join([str(i) for i in self.modes]),[dataloaders]
 
 class ImageClassificationDataset(Dataset) :
     def __init__(self,data,mode = -1,transform_sequence = None) :
@@ -40,14 +62,15 @@ class ImageClassificationDataset(Dataset) :
         if self.transform_sequence :
             img = self.transform_sequence(img)
         im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
+        gt = []
         if not self.mode == -1 :
             label = np.long(self.image_class[idx])
-            return {"inputs":[im],"ground_truths":[label]}
+            gt = [label]
         else :
             gt =[]
             if self.image_class :
                 gt = [np.long(self.image_class[idx])]
-            return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
+        return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
 
 class ImageSiameseDataset(Dataset) :
     def __init__(self,data,classes_per_sample,mode = -1,transform_sequence = None) :

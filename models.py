@@ -75,10 +75,14 @@ class CustomNetClassification(nn.Module):
             input_dim = input_dim//2
             initial_channels += growth_factor
         num_units = input_dim*input_dim*initial_channels
-        self.output_layer = nn.Sequential(nn.Linear(num_units,2*num_units),nn.ReLU(),
-                                          nn.Linear(2*num_units,2*num_units),nn.ReLU(),
-                                          nn.Linear(2*num_units,num_classes))
-    
+        self.output_layer = nn.Sequential(nn.Linear(num_units,num_classes))
+        for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                elif isinstance(m, nn.BatchNorm2d):
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)
+                    
     def forward(self,inputs,mode) :
         outputs = []
         for inp in inputs :

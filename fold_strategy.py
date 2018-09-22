@@ -8,31 +8,45 @@ Created on Mon Sep 10 11:02:42 2018
 
 import numpy as np
 import pandas as pd
+from signals import Signal
 
 class Fold(object):
-    def __init__(self,dataset,training_split):
-        self.dataset = dataset
+    def __init__(self,training_split):
         self.training_split = training_split
         self.validation_split = 1 - self.training_split
-        self.training_samples = np.int(self.training_split*self.dataset.shape[0])
-        self.validation_samples = self.dataset.shape[0] - self.training_samples
         self.num_folds = np.int(np.ceil(1.0/self.validation_split))
-    def __call__(self,fold_num):
+        self.is_init = True
+    def execute(self,dataset):
+        if self.is_init :
+            self.is_init = False
+            self.training_samples = np.int(self.training_split*dataset.shape[0])
+            self.validation_samples = dataset.shape[0] - self.training_samples
+            self.generate_folds(dataset)
+        train_dataset,validation_dataset = self.get_fold(self.num_folds-1)
+        self.num_folds -= 1
+        completion_signal = Signal.COMPLETE if self.num_folds == 0 else Signal.INCOMPLETE
+        return completion_signal,str(self.num_folds),[train_dataset,validation_dataset] 
+    def generate_folds(self,dataset) :
+        raise NotImplementedError
+    def get_fold(self,fold_num) :
         raise NotImplementedError
 
-
 class ShuffleFold(Fold) :
-    def __init__(self,dataset,training_split) :
-        super(ShuffleFold,self).__init__(dataset,training_split)    
-    def __call__(self,fold_num) :
+    def __init__(self,training_split) :
+        super(ShuffleFold,self).__init__(training_split) 
+    def generate_folds(self,dataset) :
+        self.dataset = dataset        
+    def get_fold(self,fold_num) :
         train_data = self.dataset.sample(n=self.training_samples)
         validation_data = self.dataset.drop(train_data.index)
         return train_data,validation_data
     
     
 class DeterministicFold(Fold) :
-    def __init__(self,dataset,training_split) :
-        super(DeterministicFold,self).__init__(dataset,training_split)    
+    def __init__(self,training_split) :
+        super(DeterministicFold,self).__init__(training_split)    
+    def generate_folds(self,dataset) :
+        self.dataset = dataset
         self.folds = []
         curr_indices = []
         curr_dataset = self.dataset
@@ -42,15 +56,17 @@ class DeterministicFold(Fold) :
             curr_indices = self.folds[-1].index
             curr_dataset = pruned_dataset
         self.num_folds = len(self.folds)
-    def __call__(self,fold_num) :
+    def get_fold(self,fold_num) :
         validation_data = self.folds[fold_num]
         train_data = self.dataset.drop(validation_data.index)
         return train_data,validation_data
 
 class StratifiedDeterministicFold(Fold) :
-    def __init__(self,dataset,training_split,group_keys) :
-        super(StratifiedDeterministicFold,self).__init__(dataset,training_split)
+    def __init__(self,training_split,group_keys) :
+        super(StratifiedDeterministicFold,self).__init__(training_split)
         self.group_keys = group_keys
+    def generate_folds(self,dataset) :
+        self.dataset = dataset
         self.folds = []
         curr_indices = []
         curr_dataset = self.dataset
@@ -68,16 +84,18 @@ class StratifiedDeterministicFold(Fold) :
             curr_indices = self.folds[-1].index
             curr_dataset = pruned_dataset
         self.num_folds = len(self.folds)
-    def __call__(self,fold_num) :
+    def get_fold(self,fold_num) :
         validation_data = self.folds[fold_num]
         train_data = self.dataset.drop(validation_data.index)
         return train_data,validation_data
     
 class StratifiedShuffleFold(Fold) :
-    def __init__(self,dataset,training_split,group_keys) :
-        super(StratifiedShuffleFold,self).__init__(dataset,training_split)
+    def __init__(self,training_split,group_keys) :
+        super(StratifiedShuffleFold,self).__init__(training_split)
         self.group_keys = group_keys
-    def __call__(self,fold_num) :
+    def generate_folds(self,dataset) :
+        self.dataset = dataset
+    def get_fold(self,fold_num) :
         orig_index_length = self.dataset.index[0]
         orig_index_length = 1 if np.isscalar(orig_index_length) else len(orig_index_length)
         dataset_groups = self.dataset.groupby(self.group_keys)
