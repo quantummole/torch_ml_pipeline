@@ -19,17 +19,14 @@ class Fold(object):
         self.validation_samples = self.dataset.shape[0] - self.training_samples
         self.num_folds = np.int(np.ceil(1.0/self.validation_split))
         self.is_init = True
-    def __call__(self,inputs):
+    def execute(self,dataset):
         if self.is_init :
-            dataset = inputs["dataset"]
             self.is_init = False
             self.generate_folds(dataset)
         train_dataset,validation_dataset = self.get_fold(self.num_folds)
         self.num_folds -= 1
         completion_signal = Signal.COMPLETE if self.num_folds == 0 else Signal.INCOMPLETE
-        inputs["train_dataset"] = train_dataset
-        inputs["validation_dataset"] = validation_dataset
-        return completion_signal,self.num_folds,inputs
+        return completion_signal,str(self.num_folds),[train_dataset,validation_dataset] 
     def generate_folds(self,dataset) :
         raise NotImplementedError
     def get_fold(self,fold_num) :

@@ -7,28 +7,26 @@ Created on Wed Sep 19 20:09:23 2018
 import numpy as np
 from signals import Signal
 class Sample :
-    def __init__(self,name,num_samples) :
-        self.name = name
+    def __init__(self,num_samples) :
         self.num_samples = num_samples
-    def __call__(self,inputs) :
-        self.dataset = inputs["dataset"]
+    def execute(self,dataset) :
+        self.dataset = dataset
         subset = self.sample(self.num_samples)
-        inputs["dataset"] = subset
         self.num_samples -= 1
         completion_state = Signal.COMPLETE if self.num_samples == 0 else Signal.INCOMPLETE
-        return completion_state,self.num_samples,inputs
+        return completion_state,str(self.num_samples),[subset]
     def sample(self,sample_id) :
         raise NotImplementedError
 
 class NoBootStrap(Sample) :
     def __init__(self) :
-        super(NoBootStrap,self).__init__("No Sampling",1)
+        super(NoBootStrap,self).__init__(1)
     def sample(self,sample_id) :
         return self.dataset
 
 class UnderSample(Sample) :
     def __init__(self,num_samples,group_keys,replace=False) :
-        super(UnderSample,self).__init__("UnderSampling",num_samples)
+        super(UnderSample,self).__init__(num_samples)
         self.group_keys = group_keys
         self.replace = replace
     def sample(self,sample_id) :
@@ -39,7 +37,7 @@ class UnderSample(Sample) :
 
 class OverSample(Sample) :
     def __init__(self,num_samples,group_keys,fraction) :
-        super(OverSample,self).__init__("OverSampling",num_samples)
+        super(OverSample,self).__init__(num_samples)
         self.group_keys = group_keys
         self.fraction = fraction
     def sample(self,sample_id) :

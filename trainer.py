@@ -10,21 +10,22 @@ import torch
 from tqdm import tqdm, trange
 
 class Trainer :
-    def __init__(self,network,device,optimizer,scheduler,train_dataloaders,val_dataloader,modes,evaluator,model_file) :
+    def __init__(self,network,device,optimizer,scheduler,modes,evaluator,model_file,net_params,optimizer_params,scheduler_params,max_epochs,best_val_loss) :
         self.network = network
         self.device = device
-        self.train_dataloaders = train_dataloaders
-        self.val_dataloader = val_dataloader
         self.optimizer_class = optimizer
         self.scheduler_class = scheduler
         self.modes = modes
         self.Evaluator = evaluator
-        self.model_file = model_file
-
+        self.model_file = self.Evaluator.model_logs
+        self.net = self.network(net_params).to(self.device)
+        self.optimizer = self.optimizer_class(self.net.parameters(),**optimizer_params)
+        self.scheduler = self.scheduler_class(self.optimizer,**scheduler_params)
+        self.max_epochs = max_epochs
     def train(self,mode) :
         self.net.train()
         loss_value = 0
-        with tqdm(self.train_dataloaders[mode-1],desc = "Training Epoch",leave=False) as loader :
+        with tqdm(self.dataloaders[mode],desc = "Training Epoch") as loader :
             for i_batch,sample_batch in enumerate(loader) :
                 inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
@@ -43,7 +44,7 @@ class Trainer :
         with torch.no_grad():
             self.net.eval()
             score = 0
-            with tqdm(self.val_dataloader,desc="Evaluation Epoch",leave=False) as loader :
+            with tqdm(self.dataloaders[0],desc="Evaluation Epoch") as loader :
                 for i_batch,sample_batch in enumerate(loader) :
                     inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
@@ -55,14 +56,11 @@ class Trainer :
                 score = score/(i_batch+1)
             return score
 
-    def fit(self,net_params,optimizer_params,scheduler_params,max_epochs,best_val_loss) :
+    def execute(self,dataloaders) :
         epoch_validations = []
         epoch_trainings = []
-        self.net = self.network(net_params).to(self.device)
-        self.optimizer = self.optimizer_class(self.net.parameters(),**optimizer_params)
-        self.scheduler = self.scheduler_class(self.optimizer,**scheduler_params)
-
-        with trange(max_epochs,desc="Epochs",leave=False) as epoch_iters :
+        self.dataloaders = dataloaders
+        with trange(self.max_epochs,desc="Epochs",leave=False) as epoch_iters :
             for epoch in epoch_iters :
                 if issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
                     self.scheduler.step()
@@ -74,13 +72,13 @@ class Trainer :
                     self.scheduler.step(val_loss)
                 epoch_validations.append(val_loss)
                 epoch_trainings.append(train_loss)
-                if best_val_loss >= val_loss :
+                if self.Evaluator.get_max_score >= val_loss :
                     best_val_loss = val_loss
                     torch.save(self.net.state_dict(),self.model_file)
                 epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss )
         del self.net
         torch.cuda.empty_cache()
-        return epoch_trainings,epoch_validations
+        return [epoch_trainings,epoch_validations]
         
     
 class Debugger :

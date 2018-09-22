@@ -5,12 +5,13 @@ Created on Mon Sep 10 11:02:42 2018
 @author: quantummole
 """
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, dataloader
 import pandas as pd
 import numpy as np
 from skimage import io
 from PIL import Image
 import torchvision.datasets as datasets
+
 
 #mode = -1 is for test and debug
 #mode = 0 is for validation
@@ -18,22 +19,27 @@ import torchvision.datasets as datasets
 
 from signals import Signal
 class DatasetGenerator :
-    def __init__(self,dataset_class,dataset_class_params,name = "DatasetGenerator") :
+    def __init__(self,dataset_class,dataset_class_params,batch_size,loader_options,name = "DatasetGenerator") :
         self.name = name
         self.dataset_class = dataset_class
         self.dataset_class_params = dataset_class_params
-    def __call__(self,inputs) :
-        modes = inputs["execution_modes"]
-        inputs["torch_dataset"] = inputs.get("torch_dataset",{})
+        self.batch_size = batch_size
+        self.loader_options = loader_options
+    def execute(self,execution_modes,dataloaders,train_dataset,val_dataset,dataset) :
+        modes = execution_modes    
+        if dataloaders == None :
+            dataloaders = {}
         for mode in modes :
             if mode > 0 :
-                dataset = inputs["train_dataset"]
+                dataset = train_dataset
             elif mode == 0 :
-                dataset == inputs["validation_dataset"]
+                dataset == val_dataset
             else :
-                dataset = inputs["dataset"]
-            inputs["torch_dataset"] = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params)
-        return Signal.COMPLETE,' '.join([str(i) for i in modes]),inputs
+                dataset = dataset
+            dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params)
+            dataset = dataloader.DataLoader(dataset,batch_size=self.batch_size,**self.loader_options)
+            dataloaders[mode] = dataset
+        return Signal.COMPLETE,'#'.join([str(i) for i in modes]),dataloaders
 
 class ImageClassificationDataset(Dataset) :
     def __init__(self,data,mode = -1,transform_sequence = None) :

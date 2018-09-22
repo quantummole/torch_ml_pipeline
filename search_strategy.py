@@ -5,73 +5,41 @@ Created on Fri Sep 14 18:40:24 2018
 @author: quantummole
 """
 
-import pickle
-import hashlib
 import random
-from functools import reduce 
-class Search(object) :
-    def __init__(self,params_space) :
-        self.params_space = params_space
-        self.param_grid  = [len(self.params_space[key][value]) if isinstance(self.params_space[key][value],list) else 1 for key in self.params_space.keys() for value in self.params_space[key].keys()]
-        self.max_configs = reduce(lambda x, y: x*y, self.param_grid)
-        self.curr_state = None
 
-    def generate_config_id(self,params) :
-        md5 = hashlib.md5()
-        md5.update(pickle.dumps(params))
-        md5.update(pickle.dumps(random.random()))
-        return md5.hexdigest()
-    def store_config(self,config_id,params) :
-        file = open(self.config_file.format(config_id),"wb")
-        pickle.dump(params,file)
-        file.close()
-    def get_next_state(self,curr_state,max_grid) :
+class Search(object) :
+    def __init__(self,max_configs) :
+        self.configs = [i for i in range(max_configs)]
+        self.total_configs =max_configs
+    def get_next_state(self) :
         raise NotImplementedError
-    def __call__(self) :
-        self.curr_state = self.get_next_state(self.curr_state,self.param_grid)
-        counter = 0
-        params = {}
-        for method in self.params_space.keys() :
-            params[method] = {}
-            for key in self.params_space[method].keys():
-                values = self.params_space[method][key]
-                value = -1
-                if isinstance(values, list) :
-                    value = values[self.curr_state[counter]]
-                else : 
-                    value = values
-                params[method][key] = value
-                counter += 1
-        config_id = self.generate_config_id(params)
-#        self.store_config(config_id,params)
-        return config_id,params
     def tune(self,val_score) :
         raise NotImplementedError
 
 class GridSearch(Search) :
-    def __init__(self,params_space) :
-        super(GridSearch,self).__init__(params_space)
-        self.param_keys = self.params_space.keys()
-        self.param_names_grid = [[value for value in self.params_space[key]] for key in self.param_keys] 
-        self.curr_state = [0  for l  in self.param_grid]
-        self.curr_state[0] = -1
-
-    def get_next_state(self,curr_state,max_grid):
-        if curr_state == []:
-            return []
-        else :
-            if curr_state[0] < max_grid[0]-1 :
-                return [curr_state[0]+1] + curr_state[1:]
-            else :
-                return [0] + self.get_next_state(curr_state[1:],max_grid[1:])
+    def __init__(self,max_configs) :
+        super(GridSearch,self).__init__(max_configs)
+        self.curr_state = 0
+    def get_next_state(self):
+        value =  self.configs[self.curr_state]
+        self.curr_state += 1
+        if self.curr_state == self.total_configs :
+            self.curr_state = 0
+        return value
     def tune(self,val_score) :
         pass
 
 class RandomSearch(Search) :
     def __init__(self,params_space,config_file,num_configs) :
         super(RandomSearch,self).__init__(params_space,config_file) 
-        self.max_configs = num_configs
+        self.curr_count = self.total_configs
     def get_next_state(self,curr_state,max_grid) :
-        return [random.randint(0,i-1) for i in max_grid]
+        if self.curr_count == self.total_configs :
+            random.shuffle(self.configs)
+        value = self.configs[self.curr_count - 1]
+        self.curr_count -= 1
+        if self.curr_count == 0 :
+            self.curr_count = self.total_configs
+        return value
     def tune(self,val_score) :
         pass
