@@ -13,7 +13,7 @@ from models import create_net, CustomNetClassification
 from model_blocks import DoubleConvLayer, InceptionLayer
 from loss import SupervisedMetricList, Accuracy, MarginLoss
 from evaluator import Evaluator
-from pipeline_components import Pipeline
+from pipeline_components import Pipeline, PipelineOp
 from config_sets import DictConfig, ExclusiveConfigs, NamedConfig, CombinerConfig
 
 import torch
@@ -23,16 +23,15 @@ from torchvision import transforms
 import pandas as pd
 import numpy as np
 
-def debug_fn(debug_dir,data_id,debug_info,outputs,ground_truths) :
+def debug_fn(inference_file,outputs,ground_truths,debug_info) :
     image_ids = debug_info[0]
     output_vals =  np.argmax(nn.functional.softmax(outputs[0],dim=1).cpu().numpy(),axis=1)
     if len(ground_truths) == 0 :
         data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),output_vals.reshape(-1,1)]),columns=["ImageId","Label"])
     else :
         gt = ground_truths[0].cpu().numpy().reshape(-1,1)
-        data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),gt,output_vals.reshape(-1,1)]),columns=["ImageId","Ground Truth","Label"])
-        
-    data.to_csv(debug_dir+"/"+data_id+".csv",header=False,index=False,mode="a+")
+        data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),gt,output_vals.reshape(-1,1)]),columns=["ImageId","Ground Truth","Label"])     
+    data.to_csv(inference_file+".csv",header=False,index=False,mode="a+")
 
 if __name__ == "__main__" :
     lr = NamedConfig(('lr', 1e-3))
@@ -52,14 +51,13 @@ if __name__ == "__main__" :
     plateau = DictConfig([plateau,plateau_ops])
     schedulers = ExclusiveConfigs([cosine_annealing,plateau])
     
-    evaluator_obj = Evaluator("./models/mnist_classifier")
+    evaluator_obj = Evaluator("./models/mnist_classifier",inference_fn=debug_fn)
     training_modes = NamedConfig(("modes",[1]))
-    evaluator = NamedConfig(("evaluator",evaluator_obj))
     max_epochs = NamedConfig(("max_epochs",40))
     training_objectives = NamedConfig((1,SupervisedMetricList([[nn.CrossEntropyLoss()]],[[1.0]])))
     validation_objectives = NamedConfig((0,SupervisedMetricList([[Accuracy()]],[[1.0]])))
     objective_fns = NamedConfig(("objective_fns",DictConfig([training_objectives,validation_objectives])))
-    constants = DictConfig([objective_fns,training_modes,evaluator,max_epochs])
+    constants = DictConfig([objective_fns,training_modes,max_epochs])
         
     network = NamedConfig(("network",create_net(CustomNetClassification)))
     growth_factor = NamedConfig(("growth_factor",ExclusiveConfigs([10,15,20])))
@@ -81,7 +79,7 @@ if __name__ == "__main__" :
     train_transform_options = NamedConfig((1,
                                            DictConfig([
                                                    NamedConfig(("transform_sequence",
-                                                                ExclusiveConfigs([None])))])))
+                                                                ExclusiveConfigs([train_transform,None])))])))
     validation_transform_options = NamedConfig((0,
                                                 DictConfig(
                                                         [NamedConfig(
@@ -95,9 +93,14 @@ if __name__ == "__main__" :
     dataset_class = DictConfig([datasets,execution_modes,NamedConfig(("dataset_class",ImageClassificationDataset))])
     loader_options = ExclusiveConfigs([{"loader_options" :{"batch_size":1000,"num_workers":4}}])
     dataset_generator = CombinerConfig([dataset_class,loader_options])
-    trainer_block = Pipeline([("trainer",Trainer,trainer_params)],["dataloaders"],np.mean,evaluator_obj,None)
-    datagen_block = Pipeline([("dataloader_gen",DatasetGenerator,dataset_generator)],["train_dataset","val_dataset"],np.mean,None,trainer_block)
-    input_block = Pipeline([("folds_generator",StratifiedDeterministicFold,fold_params)],["dataset"],np.mean,None,datagen_block)
+
+    trainer_op = PipelineOp("trainer",Trainer,trainer_params,evaluator_obj)
+    datagen_op  = PipelineOp("dataloader_gen",DatasetGenerator,dataset_generator)
+    input_block = PipelineOp("folds_generator",StratifiedDeterministicFold,fold_params)
+    
+    trainer_block = Pipeline([trainer_op],["dataloaders"],np.mean,None)
+    datagen_block = Pipeline([datagen_op],["train_dataset","val_dataset"],np.mean,trainer_block)
+    input_block = Pipeline([input_block],["dataset"],np.mean,datagen_block)
 
     
     print("creating dataset",flush=True)
@@ -106,7 +109,7 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     inputs = {}
     inputs["dataset"] = dataset
-    input_block.execute(inputs,'',{})
+    input_block.execute(inputs,{})
 #    scheme = CrossValidationPipeline(config_params,params_space)
 #    print("begin tuning",flush=True)
 #    config_scores  = scheme.run(dataset,120)

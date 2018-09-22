@@ -19,7 +19,7 @@ import torchvision.datasets as datasets
 
 from signals import Signal
 class DatasetGenerator :
-    def __init__(self,execution_modes,dataset_class,dataset_class_params,loader_options) :
+    def __init__(self,execution_modes,dataset_class,dataset_class_params,loader_options,evaluator = None) :
         self.dataset_class = dataset_class
         self.dataset_class_params = dataset_class_params
         self.loader_options = loader_options
@@ -37,7 +37,7 @@ class DatasetGenerator :
             dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params[mode])
             dataset = dataloader.DataLoader(dataset,**self.loader_options)
             dataloaders[mode] = dataset
-        return Signal.COMPLETE,'#'.join([str(i) for i in self.modes]),[dataloaders]
+        return Signal.COMPLETE,[dataloaders]
 
 class ImageClassificationDataset(Dataset) :
     def __init__(self,data,mode = -1,transform_sequence = None) :
