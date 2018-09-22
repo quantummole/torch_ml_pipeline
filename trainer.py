@@ -20,7 +20,7 @@ class Trainer :
         self.scheduler_class = scheduler
         self.modes = modes
         self.Evaluator = evaluator
-        self.model_file = self.Evaluator.model_file
+        self.model_file = self.Evaluator.get_model_file()
         self.net = self.network(network_params).to(self.device)
         self.optimizer = self.optimizer_class(self.net.parameters(),**optimizer_params)
         self.scheduler = self.scheduler_class(self.optimizer,**scheduler_params)
