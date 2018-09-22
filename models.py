@@ -19,8 +19,6 @@ class create_net :
         self.net = net
     def __call__(self,network_params,weights = None) :
         network = nn.DataParallel(self.net(**network_params))
-        if weights :
-            network.load_state_dict(torch.load(weights,map_location=lambda storage, loc: storage))
         return network
 
 class DensenetModels(nn.Module) :

@@ -91,9 +91,9 @@ class NamedConfig(ConfigSet) :
     def reinitialize(self) :
         self.completion_state = Signal.INCOMPLETE
         self.curr_count = 0
-        for key,item in self.config_set :
-            if isinstance(item,ConfigSet) :
-                item.reinitialize()
+        key,item = self.config_set
+        if isinstance(item,ConfigSet) :
+            item.reinitialize()
 
 class DictConfig(ConfigSet) :
     def __init__(self,params_space,searcher=GridSearch,max_configs = None):
