@@ -74,7 +74,7 @@ class Trainer :
                 debug_info = sample_batch['debug_info']
                 outputs = []
                 outputs = self.net(inputs,mode=0)
-                self.Evaluator.log("inference",[output.detach().cpu().numpy() for output in outputs],[gt.detach().cpu().numpy() for gt in ground_truths],debug_info)
+                self.Evaluator.log("inference",[output.detach().cpu() for output in outputs],[gt.detach().cpu() for gt in ground_truths],debug_info)
 
     def execute(self,dataloaders) :
         epoch_validations = []

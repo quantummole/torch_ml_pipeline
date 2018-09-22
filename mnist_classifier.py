@@ -79,7 +79,7 @@ if __name__ == "__main__" :
     train_transform_options = NamedConfig((1,
                                            DictConfig([
                                                    NamedConfig(("transform_sequence",
-                                                                ExclusiveConfigs([None])))])))
+                                                                ExclusiveConfigs([train_transform,None])))])))
     validation_transform_options = NamedConfig((0,
                                                 DictConfig(
                                                         [NamedConfig(

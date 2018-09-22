@@ -19,7 +19,9 @@ class Evaluator:
         self.inference_file = self.inference_dir+"/{}"
         self.metrics_dir = self.root_dir+"/metrics/"
         self.score_file = self.root_dir+"/score.pkl"
-        self.inference_fn = None
+        self.inference_fn = inference_fn
+        self.debug_fn = debug_fn
+        self.logger_fn = logger_fn
         self.curr_config = {}
     def __repr__(self) :
         return self.__class__.__name__+"("+self.root_dir+")"
