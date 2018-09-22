@@ -13,7 +13,7 @@ from models import create_net, CustomNetClassification
 from model_blocks import DoubleConvLayer, InceptionLayer
 from loss import SupervisedMetricList, Accuracy, MarginLoss
 from evaluator import Evaluator
-from pipeline_components import PipelineBlock, PipelineOp
+from pipeline_components import Pipeline
 from config_sets import DictConfig, ExclusiveConfigs, NamedConfig, CombinerConfig
 
 import torch
@@ -95,21 +95,18 @@ if __name__ == "__main__" :
     dataset_class = DictConfig([datasets,execution_modes,NamedConfig(("dataset_class",ImageClassificationDataset))])
     loader_options = ExclusiveConfigs([{"loader_options" :{"batch_size":1000,"num_workers":4}}])
     dataset_generator = CombinerConfig([dataset_class,loader_options])
-    
-    pipeline = [
-            ([("folds_generator",StratifiedDeterministicFold,fold_params)],["dataset"],np.mean),
-            ([("dataloader_gen",DatasetGenerator,dataset_generator)],["train_dataset","val_dataset"],np.mean),
-            ([("trainer",Trainer,trainer_params)],["dataloaders"],np.mean)
-            ]
+    trainer_block = Pipeline([("trainer",Trainer,trainer_params)],["dataloaders"],np.mean,evaluator_obj,None)
+    datagen_block = Pipeline([("dataloader_gen",DatasetGenerator,dataset_generator)],["train_dataset","val_dataset"],np.mean,None,trainer_block)
+    input_block = Pipeline([("folds_generator",StratifiedDeterministicFold,fold_params)],["dataset"],np.mean,None,datagen_block)
+
     
     print("creating dataset",flush=True)
     dataset = pd.read_csv("../datasets/mnist/train.csv",names=["path","label"])
     dataset["id"] = dataset["path"]
     print("initializing validation scheme",flush=True)
-    block = PipelineBlock("",pipeline,{},evaluator_obj)
     inputs = {}
     inputs["dataset"] = dataset
-    block.execute(inputs)
+    input_block.execute(inputs,'',{})
 #    scheme = CrossValidationPipeline(config_params,params_space)
 #    print("begin tuning",flush=True)
 #    config_scores  = scheme.run(dataset,120)
