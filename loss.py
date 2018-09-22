@@ -10,6 +10,8 @@ class SupervisedMetricList :
     def __init__(self,list_list_objective_fn,weights) :
         self.objective_fn = list_list_objective_fn
         self.weights = weights
+    def __repr__(self) :
+        return repr(self.objective_fn)
     def __call__(self,predictions,labels):
         loss = 0
         num_outputs = len(predictions)

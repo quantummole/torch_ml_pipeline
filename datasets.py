@@ -19,27 +19,25 @@ import torchvision.datasets as datasets
 
 from signals import Signal
 class DatasetGenerator :
-    def __init__(self,dataset_class,dataset_class_params,batch_size,loader_options,name = "DatasetGenerator") :
-        self.name = name
+    def __init__(self,execution_modes,dataset_class,dataset_class_params,loader_options) :
         self.dataset_class = dataset_class
         self.dataset_class_params = dataset_class_params
-        self.batch_size = batch_size
         self.loader_options = loader_options
-    def execute(self,execution_modes,dataloaders,train_dataset,val_dataset,dataset) :
-        modes = execution_modes    
+        self.modes = execution_modes
+    def execute(self,dataloaders=None,train_dataset=None,val_dataset=None,dataset=None) :
         if dataloaders == None :
             dataloaders = {}
-        for mode in modes :
+        for mode in self.modes :
             if mode > 0 :
                 dataset = train_dataset
             elif mode == 0 :
-                dataset == val_dataset
+                dataset = val_dataset
             else :
                 dataset = dataset
-            dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params)
-            dataset = dataloader.DataLoader(dataset,batch_size=self.batch_size,**self.loader_options)
+            dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params[mode])
+            dataset = dataloader.DataLoader(dataset,**self.loader_options)
             dataloaders[mode] = dataset
-        return Signal.COMPLETE,'#'.join([str(i) for i in modes]),dataloaders
+        return Signal.COMPLETE,'#'.join([str(i) for i in self.modes]),[dataloaders]
 
 class ImageClassificationDataset(Dataset) :
     def __init__(self,data,mode = -1,transform_sequence = None) :
@@ -64,14 +62,15 @@ class ImageClassificationDataset(Dataset) :
         if self.transform_sequence :
             img = self.transform_sequence(img)
         im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
+        gt = []
         if not self.mode == -1 :
             label = np.long(self.image_class[idx])
-            return {"inputs":[im],"ground_truths":[label]}
+            gt = [label]
         else :
             gt =[]
             if self.image_class :
                 gt = [np.long(self.image_class[idx])]
-            return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
+        return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
 
 class ImageSiameseDataset(Dataset) :
     def __init__(self,data,classes_per_sample,mode = -1,transform_sequence = None) :

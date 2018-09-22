@@ -7,6 +7,8 @@ Created on Mon Sep 10 11:02:42 2018
 
 
 import torch
+from torch.autograd import Variable
+import numpy as np
 from tqdm import tqdm, trange
 from signals import Signal
 
@@ -28,19 +30,21 @@ class Trainer :
     def train(self,mode) :
         self.net.train()
         loss_value = 0
+        grads = []
         with tqdm(self.dataloaders[mode],desc = "Training Epoch") as loader :
             for i_batch,sample_batch in enumerate(loader) :
-                inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
+                inputs = [Variable(inp.to(self.device), requires_grad=True) for inp in sample_batch['inputs']]
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                 debug_info = sample_batch['debug_info']
                 self.optimizer.zero_grad()
                 outputs = self.net(inputs,mode)
                 loss = self.objective_fns[mode](outputs,ground_truths)
                 loss.backward()
+                grads.append(torch.abs(inputs[0].grad).mean().item())
                 self.optimizer.step()
                 self.Evaluator.log(mode,[output.detach().cpu().numpy() for output in outputs],[gt.detach().cpu().numpy() for gt in ground_truths],debug_info)
                 loss_value += loss.detach().item()
-                loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode)
+                loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode, mean_grad = np.mean(grads))
         return loss_value/(i_batch+1)
             
     def validate(self) :
@@ -63,7 +67,7 @@ class Trainer :
         epoch_validations = []
         epoch_trainings = []
         self.dataloaders = dataloaders
-        with trange(self.max_epochs,desc="Epochs",leave=False) as epoch_iters :
+        with trange(self.max_epochs,desc="Epochs") as epoch_iters :
             for epoch in epoch_iters :
                 if issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
                     self.scheduler.step()
@@ -78,7 +82,7 @@ class Trainer :
                 if self.val_max_score >= val_loss :
                     best_val_loss = val_loss
                     torch.save(self.net.state_dict(),self.model_file)
-                epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss )
+                epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss,lr = self.scheduler.get_lr() )
         del self.net
         torch.cuda.empty_cache()
         return Signal.COMPLETE,"complete",[epoch_trainings,epoch_validations]

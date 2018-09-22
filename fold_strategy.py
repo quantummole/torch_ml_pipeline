@@ -11,19 +11,18 @@ import pandas as pd
 from signals import Signal
 
 class Fold(object):
-    def __init__(self,name,training_split):
-        self.name = name
+    def __init__(self,training_split):
         self.training_split = training_split
         self.validation_split = 1 - self.training_split
-        self.training_samples = np.int(self.training_split*self.dataset.shape[0])
-        self.validation_samples = self.dataset.shape[0] - self.training_samples
         self.num_folds = np.int(np.ceil(1.0/self.validation_split))
         self.is_init = True
     def execute(self,dataset):
         if self.is_init :
             self.is_init = False
+            self.training_samples = np.int(self.training_split*dataset.shape[0])
+            self.validation_samples = dataset.shape[0] - self.training_samples
             self.generate_folds(dataset)
-        train_dataset,validation_dataset = self.get_fold(self.num_folds)
+        train_dataset,validation_dataset = self.get_fold(self.num_folds-1)
         self.num_folds -= 1
         completion_signal = Signal.COMPLETE if self.num_folds == 0 else Signal.INCOMPLETE
         return completion_signal,str(self.num_folds),[train_dataset,validation_dataset] 
@@ -34,7 +33,7 @@ class Fold(object):
 
 class ShuffleFold(Fold) :
     def __init__(self,training_split) :
-        super(ShuffleFold,self).__init__("ShuffleFold",training_split) 
+        super(ShuffleFold,self).__init__(training_split) 
     def generate_folds(self,dataset) :
         self.dataset = dataset        
     def get_fold(self,fold_num) :
@@ -45,7 +44,7 @@ class ShuffleFold(Fold) :
     
 class DeterministicFold(Fold) :
     def __init__(self,training_split) :
-        super(DeterministicFold,self).__init__("DeterministicFold",training_split)    
+        super(DeterministicFold,self).__init__(training_split)    
     def generate_folds(self,dataset) :
         self.dataset = dataset
         self.folds = []
@@ -64,7 +63,7 @@ class DeterministicFold(Fold) :
 
 class StratifiedDeterministicFold(Fold) :
     def __init__(self,training_split,group_keys) :
-        super(StratifiedDeterministicFold,self).__init__("StratifiedDeterministicFold",training_split)
+        super(StratifiedDeterministicFold,self).__init__(training_split)
         self.group_keys = group_keys
     def generate_folds(self,dataset) :
         self.dataset = dataset
@@ -92,7 +91,7 @@ class StratifiedDeterministicFold(Fold) :
     
 class StratifiedShuffleFold(Fold) :
     def __init__(self,training_split,group_keys) :
-        super(StratifiedShuffleFold,self).__init__("StratifiedShuffleFold",training_split)
+        super(StratifiedShuffleFold,self).__init__(training_split)
         self.group_keys = group_keys
     def generate_folds(self,dataset) :
         self.dataset = dataset

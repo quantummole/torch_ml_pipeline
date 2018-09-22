@@ -15,7 +15,7 @@ class Evaluator:
         self.metrics_dir = log_dir+"/metrics/"
         self.score_file = log_dir+"/score.pkl"
         
-    def log(self,mode,outputs,targets) :
+    def log(self,mode,outputs,targets,debug_info) :
         pass
     def log_config(self,config_id,config) :
         file = open(self.config_file.format(config_id),"wb")
