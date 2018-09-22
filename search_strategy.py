@@ -9,7 +9,7 @@ import random
 
 class Search(object) :
     def __init__(self,max_configs) :
-        self.configs = [i for i in range(max_configs)]
+        self.configs = [i+1 for i in range(max_configs)]
         self.total_configs =max_configs
     def get_next_state(self) :
         raise NotImplementedError

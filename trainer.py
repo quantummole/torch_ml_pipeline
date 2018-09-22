@@ -8,20 +8,23 @@ Created on Mon Sep 10 11:02:42 2018
 
 import torch
 from tqdm import tqdm, trange
+from signals import Signal
 
 class Trainer :
-    def __init__(self,network,device,optimizer,scheduler,modes,evaluator,model_file,net_params,optimizer_params,scheduler_params,max_epochs,best_val_loss) :
+    def __init__(self,network,network_params,optimizer,optimizer_params,scheduler,scheduler_params,modes,evaluator,max_epochs,objective_fns,val_max_score=1e+5) :
         self.network = network
-        self.device = device
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.optimizer_class = optimizer
         self.scheduler_class = scheduler
         self.modes = modes
         self.Evaluator = evaluator
-        self.model_file = self.Evaluator.model_logs
-        self.net = self.network(net_params).to(self.device)
+        self.model_file = self.Evaluator.model_file
+        self.net = self.network(network_params).to(self.device)
         self.optimizer = self.optimizer_class(self.net.parameters(),**optimizer_params)
         self.scheduler = self.scheduler_class(self.optimizer,**scheduler_params)
         self.max_epochs = max_epochs
+        self.objective_fns = objective_fns
+        self.val_max_score = val_max_score
     def train(self,mode) :
         self.net.train()
         loss_value = 0
@@ -32,7 +35,7 @@ class Trainer :
                 debug_info = sample_batch['debug_info']
                 self.optimizer.zero_grad()
                 outputs = self.net(inputs,mode)
-                loss = self.Evaluator.get_objective(mode)(outputs,ground_truths)
+                loss = self.objective_fns[mode](outputs,ground_truths)
                 loss.backward()
                 self.optimizer.step()
                 self.Evaluator.log(mode,[output.detach().cpu().numpy() for output in outputs],[gt.detach().cpu().numpy() for gt in ground_truths],debug_info)
@@ -50,7 +53,7 @@ class Trainer :
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                     debug_info = sample_batch['debug_info']
                     outputs = self.net(inputs,mode=0)
-                    score += self.Evaluator.get_objective(0)(outputs,ground_truths).item()
+                    score += self.objective_fns[0](outputs,ground_truths).item()
                     self.Evaluator.log(0,[output.detach().cpu().numpy() for output in outputs],[gt.detach().cpu().numpy() for gt in ground_truths],debug_info)
                     loader.set_postfix(score=(score/(i_batch+1)))
                 score = score/(i_batch+1)
@@ -72,13 +75,13 @@ class Trainer :
                     self.scheduler.step(val_loss)
                 epoch_validations.append(val_loss)
                 epoch_trainings.append(train_loss)
-                if self.Evaluator.get_max_score >= val_loss :
+                if self.val_max_score >= val_loss :
                     best_val_loss = val_loss
                     torch.save(self.net.state_dict(),self.model_file)
                 epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss )
         del self.net
         torch.cuda.empty_cache()
-        return [epoch_trainings,epoch_validations]
+        return Signal.COMPLETE,"complete",[epoch_trainings,epoch_validations]
         
     
 class Debugger :
