@@ -29,8 +29,8 @@ class Pipeline :
                 new_params = deepcopy(params_state)
                 new_params, outputs = op.execute(curr_score,new_params,op_inputs)
                 if self.pipeline :
-                    for i,name in enumerate(self.output_names) :
-                        self.inputs[name] = outputs[i]
+                    for i,name in enumerate(outputs) :
+                        self.inputs[self.output_names[i]] = outputs[i]
                     curr_score = self.pipeline.execute(self.inputs,new_params)
                     op_scores.append(curr_score)
                 else :

@@ -24,7 +24,7 @@ class DatasetGenerator :
         self.dataset_class_params = dataset_class_params
         self.loader_options = loader_options
         self.modes = execution_modes
-    def execute(self,dataloaders=None,train_dataset=None,val_dataset=None,dataset=None) :
+    def execute(self,dataloaders=None,train_dataset=None,val_dataset=None,dataset_list=[]) :
         if dataloaders == None :
             dataloaders = {}
         for mode in self.modes :
@@ -33,9 +33,15 @@ class DatasetGenerator :
             elif mode == 0 :
                 dataset = val_dataset
             else :
-                dataset = dataset
-            dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params[mode])
-            dataset = dataloader.DataLoader(dataset,**self.loader_options)
+                dataset = dataset_list
+            if mode >= 0 :
+                dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params[mode])
+                dataset = dataloader.DataLoader(dataset,**self.loader_options)
+            else :
+                dataset_list = [val_dataset]+dataset_list
+                dataset_set = [self.dataset_class(data=dataset,mode=0,**self.dataset_class_params[0]) for dataset in dataset_list]
+                dataset = [dataloader.DataLoader(dataset,**self.loader_options) for dataset in dataset_set]
+                mode = 'inference'
             dataloaders[mode] = dataset
         return Signal.COMPLETE,[dataloaders]
 
@@ -46,13 +52,10 @@ class ImageClassificationDataset(Dataset) :
         self.transform_sequence = transform_sequence
         self.image_id = data.id.values.tolist()
         self.image_paths = data.path.values.tolist()
-        if not self.mode == -1 :
+        if "label" in data.columns:
             self.image_class = data.label.values.tolist()
         else :
-            if "label" in data.columns:
-                self.image_class = data.label.values.tolist()
-            else :
-                self.image_class = None
+            self.image_class = None
     def __len__(self) :
         return len(self.image_paths)
     def __getitem__(self,idx) :
@@ -63,13 +66,9 @@ class ImageClassificationDataset(Dataset) :
             img = self.transform_sequence(img)
         im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
         gt = []
-        if not self.mode == -1 :
+        if self.image_class :
             label = np.long(self.image_class[idx])
             gt = [label]
-        else :
-            gt =[]
-            if self.image_class :
-                gt = [np.long(self.image_class[idx])]
         return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
 
 class ImageSiameseDataset(Dataset) :

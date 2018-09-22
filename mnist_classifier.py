@@ -23,7 +23,7 @@ from torchvision import transforms
 import pandas as pd
 import numpy as np
 
-def debug_fn(inference_file,outputs,ground_truths,debug_info) :
+def debug_fn(inference_file,data_id,outputs,ground_truths,debug_info) :
     image_ids = debug_info[0]
     output_vals =  np.argmax(nn.functional.softmax(outputs[0],dim=1).cpu().numpy(),axis=1)
     if len(ground_truths) == 0 :
@@ -31,7 +31,7 @@ def debug_fn(inference_file,outputs,ground_truths,debug_info) :
     else :
         gt = ground_truths[0].cpu().numpy().reshape(-1,1)
         data = pd.DataFrame(np.hstack([np.array(image_ids).reshape(-1,1),gt,output_vals.reshape(-1,1)]),columns=["ImageId","Ground Truth","Label"])     
-    data.to_csv(inference_file+".csv",header=False,index=False,mode="a+")
+    data.to_csv(inference_file+"_{}.csv".format(data_id),header=False,index=False,mode="a+")
 
 if __name__ == "__main__" :
     lr = NamedConfig(('lr', 1e-3))
@@ -53,7 +53,7 @@ if __name__ == "__main__" :
     
     evaluator_obj = Evaluator("./models/mnist_classifier",inference_fn=debug_fn)
     training_modes = NamedConfig(("modes",[1]))
-    max_epochs = NamedConfig(("max_epochs",40))
+    max_epochs = NamedConfig(("max_epochs",1))
     training_objectives = NamedConfig((1,SupervisedMetricList([[nn.CrossEntropyLoss()]],[[1.0]])))
     validation_objectives = NamedConfig((0,SupervisedMetricList([[Accuracy()]],[[1.0]])))
     objective_fns = NamedConfig(("objective_fns",DictConfig([training_objectives,validation_objectives])))
@@ -84,7 +84,7 @@ if __name__ == "__main__" :
                                                 DictConfig(
                                                         [NamedConfig(
                                                                 ("transform_sequence",None))])))
-    execution_modes = NamedConfig(("execution_modes",[0,1]))
+    execution_modes = NamedConfig(("execution_modes",[0,1,-1]))
     datasets = NamedConfig(("dataset_class_params",
                                 DictConfig(
                                     [train_transform_options,validation_transform_options])))
@@ -99,25 +99,24 @@ if __name__ == "__main__" :
     input_block = PipelineOp("folds_generator",StratifiedDeterministicFold,fold_params)
     
     trainer_block = Pipeline([trainer_op],["dataloaders"],np.mean,None)
-    datagen_block = Pipeline([datagen_op],["train_dataset","val_dataset"],np.mean,trainer_block)
+    datagen_block = Pipeline([datagen_op],["train_dataset","val_dataset","dataset_list"],np.mean,trainer_block)
     input_block = Pipeline([input_block],["dataset"],np.mean,datagen_block)
 
+    PATH = "../datasets/mnist/testSet"
+    import os
+    image_ids = [x.replace("img_","").replace(".jpg","") for x in os.listdir(PATH)]
+    image_files = [PATH+"/img_"+i+".jpg" for i in image_ids]
+    test_dataset = np.hstack([np.array(image_ids).reshape(-1,1),np.array(image_files).reshape(-1,1)])
+    test_dataset = pd.DataFrame(test_dataset,columns=["id","path"])
     
     print("creating dataset",flush=True)
     dataset = pd.read_csv("../datasets/mnist/train.csv",names=["path","label"])
     dataset["id"] = dataset["path"]
     print("initializing validation scheme",flush=True)
     inputs = {}
+
     inputs["dataset"] = dataset
+    inputs['dataset_list'] = [test_dataset]
     input_block.execute(inputs,{})
-#    scheme = CrossValidationPipeline(config_params,params_space)
-#    print("begin tuning",flush=True)
-#    config_scores  = scheme.run(dataset,120)
-#    print("tuning completed" ,config_scores,flush=True)
-#    PATH = "../datasets/mnist/testSet"
-#    import os
-#    image_ids = [x.replace("img_","").replace(".jpg","") for x in os.listdir(PATH)]
-#    image_files = [PATH+"/img_"+i+".jpg" for i in image_ids]
-#    test_dataset = np.hstack([np.array(image_ids).reshape(-1,1),np.array(image_files).reshape(-1,1)])
-#    test_dataset = pd.DataFrame(test_dataset,columns=["id","path"])
+
 #    scheme.infer([test_dataset,dataset],["test_scores","train_scores"],debug_fn)

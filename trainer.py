@@ -66,15 +66,16 @@ class Trainer :
 
     def infer(self) :
         self.net.load_state_dict(torch.load(self.model_file,map_location=lambda storage, loc: storage))
-        with torch.no_grad():
-            self.net.eval()
-            for i_batch,sample_batch in enumerate(self.dataloaders[0]) :
-                inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
-                ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
-                debug_info = sample_batch['debug_info']
-                outputs = []
-                outputs = self.net(inputs,mode=0)
-                self.Evaluator.log("inference",[output.detach().cpu() for output in outputs],[gt.detach().cpu() for gt in ground_truths],debug_info)
+        for data_id,loader in enumerate(self.dataloaders['inference']) :
+            with torch.no_grad():
+                self.net.eval()
+                for i_batch,sample_batch in enumerate(loader) :
+                    inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
+                    ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
+                    debug_info = sample_batch['debug_info']
+                    outputs = []
+                    outputs = self.net(inputs,mode=0)
+                    self.Evaluator.log("inference",data_id,[output.detach().cpu() for output in outputs],[gt.detach().cpu() for gt in ground_truths],debug_info)
 
     def execute(self,dataloaders) :
         epoch_validations = []
@@ -95,7 +96,7 @@ class Trainer :
                 if self.val_max_score >= val_loss :
                     best_val_loss = val_loss
                     torch.save(self.net.state_dict(),self.model_file)
-                epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss,lr = self.scheduler.get_lr() )
+                epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss)
         self.infer()
         del self.net
         torch.cuda.empty_cache()
