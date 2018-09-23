@@ -53,7 +53,7 @@ if __name__ == "__main__" :
     
     evaluator_obj = Evaluator("./models/mnist_classifier",inference_fn=debug_fn)
     training_modes = NamedConfig(("modes",[1]))
-    max_epochs = NamedConfig(("max_epochs",1))
+    max_epochs = NamedConfig(("max_epochs",40))
     training_objectives = NamedConfig((1,SupervisedMetricList([[nn.CrossEntropyLoss()]],[[1.0]])))
     validation_objectives = NamedConfig((0,SupervisedMetricList([[Accuracy()]],[[1.0]])))
     objective_fns = NamedConfig(("objective_fns",DictConfig([training_objectives,validation_objectives])))
@@ -111,7 +111,7 @@ if __name__ == "__main__" :
     network = DictConfig([network])    
     trainer_params = CombinerConfig([network,network_loader_params,optimizers,schedulers,constants])
     
-    fold_params  = ExclusiveConfigs([{"training_split":0.5,"group_keys":["label"]}])
+    fold_params  = ExclusiveConfigs([{"training_split":0.8,"group_keys":["label"]}])
     
     train_transform = transforms.Compose([
         transforms.RandomAffine(10,(0.2,0.2),shear=1)
@@ -153,8 +153,8 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     inputs = {}
 
-    inputs["dataset"] = dataset.sample(n=2000)
-    inputs['dataset_list'] = [test_dataset.sample(n=1000)]
+    inputs["dataset"] = dataset
+    inputs['dataset_list'] = [test_dataset]
     input_block.execute(inputs,{})
 
 #    scheme.infer([test_dataset,dataset],["test_scores","train_scores"],debug_fn)
