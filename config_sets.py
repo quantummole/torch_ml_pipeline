@@ -2,7 +2,7 @@
 """
 Created on Sat Sep 22 07:42:33 2018
 
-@author: quant
+@author: quantummole
 """
 
 from signals import Signal
@@ -107,12 +107,8 @@ class DictConfig(ConfigSet) :
     def get_config(self,config_num) :
         config_num_list = [1]*len(self.param_grid)
         for i,value in enumerate(self.param_grid) :
-            if config_num <= value :
-                config_num_list[i] = config_num
-                break
-            else :
-                config_num_list[i] = (config_num % value) + 1
-                config_num = config_num//value
+            config_num_list[i] = (config_num % value) + 1
+            config_num = config_num//value
         configs = [self.config_set[i].get_config(config_num) for i,config_num in enumerate(config_num_list)]
         return dict(configs)
                 
@@ -134,12 +130,8 @@ class CombinerConfig(ConfigSet) :
     def get_config(self,config_num) :
         config_num_list = [1]*len(self.param_grid)
         for i,value in enumerate(self.param_grid) :
-            if config_num <= value :
-                config_num_list[i] = config_num
-                break
-            else :
-                config_num_list[i] = (config_num % value) + 1
-                config_num = config_num//value
+            config_num_list[i] = (config_num % value) + 1
+            config_num = config_num//value
         configs = {}
         for i,config_num in enumerate(config_num_list) :
             config = self.config_set[i].get_config(config_num)
