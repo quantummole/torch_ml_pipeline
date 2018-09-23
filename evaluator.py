@@ -29,7 +29,7 @@ class Evaluator:
         return self.__class__.__name__+"("+self.root_dir+")"
     def get_uniqueness_counter(self,config_id) :
         config_list = os.listdir(self.config_dir)
-        return str(len([config for config in config_list if config_id in config_list]))
+        return str(len([config for config in config_list if config_id in config]))
     def set_config_id(self) :
             md5 = hashlib.md5()
             md5.update(pickle.dumps(self.curr_config))
