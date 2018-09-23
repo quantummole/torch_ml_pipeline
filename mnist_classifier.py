@@ -60,16 +60,56 @@ if __name__ == "__main__" :
     constants = DictConfig([objective_fns,training_modes,max_epochs])
         
     network = NamedConfig(("network",create_net(CustomNetClassification)))
-    growth_factor = NamedConfig(("growth_factor",ExclusiveConfigs([10,15,20])))
+
+    growth_factor = NamedConfig(("growth_factor",ExclusiveConfigs([10])))
     input_dim = NamedConfig(("input_dim",28))
     final_dim = NamedConfig(("final_conv_dim",8))
     initial_channels = NamedConfig(("initial_channels",1))
     num_classes = NamedConfig(("num_classes",10))
     conv_module = NamedConfig(("conv_module",ExclusiveConfigs([DoubleConvLayer,InceptionLayer])))
     network_params = NamedConfig(("network_params",DictConfig([growth_factor,input_dim,final_dim,initial_channels,num_classes,conv_module])))
-    network = DictConfig([network,network_params])
+
+    train_loader_options = NamedConfig((1,{"shuffle":True,"batch_size":1000,"num_workers":4}))
+    val_loader_options = NamedConfig((0,{"batch_size":1000,"num_workers":4}))
+    loader_options = NamedConfig(("loader_options",DictConfig(
+            [train_loader_options,val_loader_options])))
+    network_loader_set1 = DictConfig([network_params,loader_options])
+
+
+
+    growth_factor = NamedConfig(("growth_factor",ExclusiveConfigs([15])))
+    input_dim = NamedConfig(("input_dim",28))
+    final_dim = NamedConfig(("final_conv_dim",8))
+    initial_channels = NamedConfig(("initial_channels",1))
+    num_classes = NamedConfig(("num_classes",10))
+    conv_module = NamedConfig(("conv_module",ExclusiveConfigs([DoubleConvLayer,InceptionLayer])))
+    network_params = NamedConfig(("network_params",DictConfig([growth_factor,input_dim,final_dim,initial_channels,num_classes,conv_module])))
+
+    train_loader_options = NamedConfig((1,{"shuffle":True,"batch_size":500,"num_workers":4}))
+    val_loader_options = NamedConfig((0,{"batch_size":500,"num_workers":4}))
+    loader_options = NamedConfig(("loader_options",DictConfig(
+            [train_loader_options,val_loader_options])))
+    network_loader_set2 = DictConfig([network_params,loader_options])
+
+
+    growth_factor = NamedConfig(("growth_factor",ExclusiveConfigs([15])))
+    input_dim = NamedConfig(("input_dim",28))
+    final_dim = NamedConfig(("final_conv_dim",8))
+    initial_channels = NamedConfig(("initial_channels",1))
+    num_classes = NamedConfig(("num_classes",10))
+    conv_module = NamedConfig(("conv_module",ExclusiveConfigs([DoubleConvLayer,InceptionLayer])))
+    network_params = NamedConfig(("network_params",DictConfig([growth_factor,input_dim,final_dim,initial_channels,num_classes,conv_module])))
+
+    train_loader_options = NamedConfig((1,{"shuffle":True,"batch_size":250,"num_workers":4}))
+    val_loader_options = NamedConfig((0,{"batch_size":250,"num_workers":4}))
+    loader_options = NamedConfig(("loader_options",DictConfig(
+            [train_loader_options,val_loader_options])))
+    network_loader_set3 = DictConfig([network_params,loader_options])
     
-    trainer_params = CombinerConfig([network,optimizers,schedulers,constants])
+    
+    network_loader_params = ExclusiveConfigs([network_loader_set1,network_loader_set2,network_loader_set3])
+    network = DictConfig([network])    
+    trainer_params = CombinerConfig([network,network_loader_params,optimizers,schedulers,constants])
     
     fold_params  = ExclusiveConfigs([{"training_split":0.5,"group_keys":["label"]}])
     
@@ -90,15 +130,13 @@ if __name__ == "__main__" :
                                     [train_transform_options,validation_transform_options])))
 
 
-    dataset_class = DictConfig([datasets,execution_modes,NamedConfig(("dataset_class",ImageClassificationDataset))])
-    loader_options = ExclusiveConfigs([{"loader_options" :{"batch_size":1000,"num_workers":4}}])
-    dataset_generator = CombinerConfig([dataset_class,loader_options])
+    dataset_generator = DictConfig([datasets,execution_modes,NamedConfig(("dataset_class",ImageClassificationDataset))])
 
     trainer_op = PipelineOp("trainer",Trainer,trainer_params,evaluator_obj)
     datagen_op  = PipelineOp("dataloader_gen",DatasetGenerator,dataset_generator)
     input_block = PipelineOp("folds_generator",StratifiedDeterministicFold,fold_params)
     
-    trainer_block = Pipeline([trainer_op],["dataloaders"],np.mean,None)
+    trainer_block = Pipeline([trainer_op],["datasets"],np.mean,None)
     datagen_block = Pipeline([datagen_op],["train_dataset","val_dataset","dataset_list"],np.mean,trainer_block)
     input_block = Pipeline([input_block],["dataset"],np.mean,datagen_block)
 
@@ -115,8 +153,8 @@ if __name__ == "__main__" :
     print("initializing validation scheme",flush=True)
     inputs = {}
 
-    inputs["dataset"] = dataset
-    inputs['dataset_list'] = [test_dataset]
+    inputs["dataset"] = dataset.sample(n=2000)
+    inputs['dataset_list'] = [test_dataset.sample(n=1000)]
     input_block.execute(inputs,{})
 
 #    scheme.infer([test_dataset,dataset],["test_scores","train_scores"],debug_fn)

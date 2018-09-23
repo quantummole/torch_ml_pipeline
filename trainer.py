@@ -8,12 +8,20 @@ Created on Mon Sep 10 11:02:42 2018
 
 import torch
 from torch.autograd import Variable
+from torch.utils.data import dataloader
 import numpy as np
 from tqdm import tqdm, trange
 from signals import Signal
 
 class Trainer :
-    def __init__(self,network,network_params,optimizer,optimizer_params,scheduler,scheduler_params,modes,evaluator,max_epochs,objective_fns,val_max_score=1e+5) :
+    def __init__(self,network,network_params,
+                 optimizer,optimizer_params,
+                 scheduler,scheduler_params,
+                 modes,loader_options,
+                 evaluator,
+                 max_epochs,
+                 objective_fns,
+                 val_max_score=1e+5) :
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.network = network
         self.network_params = network_params
@@ -22,6 +30,7 @@ class Trainer :
         self.scheduler_params = scheduler_params
         self.scheduler_class = scheduler
         self.modes = modes
+        self.loader_options = loader_options
         self.Evaluator = evaluator
         self.model_file = self.Evaluator.get_model_file()
         self.net = self.network(self.network_params).to(self.device)
@@ -77,10 +86,16 @@ class Trainer :
                     outputs = self.net(inputs,mode=0)
                     self.Evaluator.log("inference",data_id,[output.detach().cpu() for output in outputs],[gt.detach().cpu() for gt in ground_truths],debug_info)
 
-    def execute(self,dataloaders) :
-        epoch_validations = []
-        epoch_trainings = []
-        self.dataloaders = dataloaders
+    def execute(self,datasets) :
+        epoch_scores = []
+        self.dataloaders = {}
+        get = lambda myD,key : myD[key] if key in myD else myD[0]
+        for mode in datasets.keys() :
+            dataset = datasets[mode]
+            if not isinstance(dataset,list) :
+                self.dataloaders[mode] = dataloader.DataLoader(dataset,**get(self.loader_options,mode))
+            else :
+                self.dataloaders[mode] = [dataloader.DataLoader(data,**get(self.loader_options,mode)) for data in dataset]
         with trange(self.max_epochs,desc="Epochs") as epoch_iters :
             for epoch in epoch_iters :
                 if issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
@@ -89,18 +104,18 @@ class Trainer :
                 for mode in self.modes :
                     train_loss.append(self.train(mode))
                 val_loss = self.validate()
+                scores = [val_loss] + train_loss
+                epoch_scores.append(scores)
                 if not issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
                     self.scheduler.step(val_loss)
-                epoch_validations.append(val_loss)
-                epoch_trainings.append(train_loss)
                 if self.val_max_score >= val_loss :
-                    best_val_loss = val_loss
+                    self.val_max_score = val_loss
                     torch.save(self.net.state_dict(),self.model_file)
-                epoch_iters.set_postfix(best_validation_loss = best_val_loss, training_loss = train_loss)
+                epoch_iters.set_postfix(best_validation_loss =  self.val_max_score , training_loss = train_loss)
         self.infer()
         del self.net
         torch.cuda.empty_cache()
-        return Signal.COMPLETE,[epoch_trainings,epoch_validations]
+        return Signal.COMPLETE,[epoch_scores]
         
     
 class Debugger :

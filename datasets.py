@@ -5,7 +5,7 @@ Created on Mon Sep 10 11:02:42 2018
 @author: quantummole
 """
 
-from torch.utils.data import Dataset, dataloader
+from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
 from skimage import io
@@ -19,14 +19,13 @@ import torchvision.datasets as datasets
 
 from signals import Signal
 class DatasetGenerator :
-    def __init__(self,execution_modes,dataset_class,dataset_class_params,loader_options,evaluator = None) :
+    def __init__(self,execution_modes,dataset_class,dataset_class_params,evaluator = None) :
         self.dataset_class = dataset_class
         self.dataset_class_params = dataset_class_params
-        self.loader_options = loader_options
         self.modes = execution_modes
-    def execute(self,dataloaders=None,train_dataset=None,val_dataset=None,dataset_list=[]) :
-        if dataloaders == None :
-            dataloaders = {}
+    def execute(self,datasets=None,train_dataset=None,val_dataset=None,dataset_list=[]) :
+        if datasets == None :
+            datasets = {}
         for mode in self.modes :
             if mode > 0 :
                 dataset = train_dataset
@@ -36,14 +35,12 @@ class DatasetGenerator :
                 dataset = dataset_list
             if mode >= 0 :
                 dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params[mode])
-                dataset = dataloader.DataLoader(dataset,**self.loader_options)
             else :
                 dataset_list = [val_dataset]+dataset_list
-                dataset_set = [self.dataset_class(data=dataset,mode=0,**self.dataset_class_params[0]) for dataset in dataset_list]
-                dataset = [dataloader.DataLoader(dataset,**self.loader_options) for dataset in dataset_set]
+                dataset = [self.dataset_class(data=dataset,mode=0,**self.dataset_class_params[0]) for dataset in dataset_list]
                 mode = 'inference'
-            dataloaders[mode] = dataset
-        return Signal.COMPLETE,[dataloaders]
+            datasets[mode] = dataset
+        return Signal.COMPLETE,[datasets]
 
 class ImageClassificationDataset(Dataset) :
     def __init__(self,data,mode = -1,transform_sequence = None) :
