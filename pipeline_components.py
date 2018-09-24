@@ -69,7 +69,7 @@ class PipelineOp :
             self.curr_op = self.op_class(**self.params,evaluator = self.evaluator)
             self.op_completion_state = Signal.INCOMPLETE
         if self.op_completion_state == Signal.INCOMPLETE :
-             try :
+            try :
                self.op_completion_state,outputs = self.curr_op.execute(**inputs)
             except :
                print(self.new_params)
