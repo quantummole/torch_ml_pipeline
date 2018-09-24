@@ -55,9 +55,9 @@ class ResnetModels(nn.Module) :
         return outputs
 
 class PreTrainedClassifier(nn.Module) :
-    def __init__(self,model,num_classes) :
+    def __init__(self,model_class,model,num_classes) :
         super(PreTrainedClassifier,self).__init__()
-        self.model = model
+        self.model = model_class(model)
         self.num_classes = num_classes
         self.model.update_final_layer(nn.Linear(self.model.final_layer_features,self.num_classes))
     def forward(self,inputs,mode) :
