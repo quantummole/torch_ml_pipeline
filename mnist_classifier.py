@@ -155,6 +155,6 @@ if __name__ == "__main__" :
 
     inputs["dataset"] = dataset
     inputs['dataset_list'] = [test_dataset]
-    input_block.execute(inputs,{})
+    input_block.execute(inputs,{}) 
 
 #    scheme.infer([test_dataset,dataset],["test_scores","train_scores"],debug_fn)
