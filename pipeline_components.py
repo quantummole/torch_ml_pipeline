@@ -7,6 +7,7 @@ Created on Fri Sep 21 19:15:00 2018
 
 from signals import Signal
 from copy import deepcopy
+import traceback
 
 class Pipeline :
     def __init__(self,op_set,input_names,score_combiner,pipeline = None) :
@@ -68,7 +69,11 @@ class PipelineOp :
             self.curr_op = self.op_class(**self.params,evaluator = self.evaluator)
             self.op_completion_state = Signal.INCOMPLETE
         if self.op_completion_state == Signal.INCOMPLETE :
-            self.op_completion_state,outputs = self.curr_op.execute(**inputs)
+             try :
+               self.op_completion_state,outputs = self.curr_op.execute(**inputs)
+            except :
+               print(self.new_params)
+               traceback.print_exc()
         self.completion_state = Signal.COMPLETE if self.config_sets.completion_state == self.op_completion_state and self.config_sets.completion_state == Signal.COMPLETE else Signal.INCOMPLETE 
         return self.new_params, outputs
         
