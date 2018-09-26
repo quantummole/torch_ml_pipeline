@@ -62,6 +62,10 @@ class ImageClassificationDataset(Dataset) :
         if self.transform_sequence :
             img = self.transform_sequence(img)
         im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
+        if len(im.shape) == 3 :
+            m,n,c = im.shape
+            if c < m :
+                im = np.transpose(im,(2,0,1))
         gt = []
         if self.image_class :
             label = np.long(self.image_class[idx])
