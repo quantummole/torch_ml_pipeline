@@ -18,7 +18,8 @@ class ConfigSet :
     def __repr__(self) :
         return self.__class__.__name__+"("+repr(self.config_set)+")"
     def initialize_searcher(self) :
-        self.searcher = self.searcher_class(self.get_max_configs())
+        if self.searcher_class :
+            self.searcher = self.searcher_class(self.get_max_configs())
     def get_next(self,score) :
         if self.searcher == None :
             self.initialize_searcher()
@@ -38,7 +39,7 @@ class ConfigSet :
          raise NotImplementedError    
 
 class ExclusiveConfigs(ConfigSet) :
-    def __init__(self,params_space,searcher=GridSearch,max_configs = None):
+    def __init__(self,params_space,searcher=None,max_configs = None):
         super(ExclusiveConfigs,self).__init__(params_space,searcher)
         self.param_grid = []
         for value in self.config_set :
@@ -64,12 +65,13 @@ class ExclusiveConfigs(ConfigSet) :
     def reinitialize(self) :
         self.completion_state = Signal.INCOMPLETE
         self.curr_count = 0
+        self.initialize_searcher()
         for item in self.config_set :
             if isinstance(item,ConfigSet) :
                 item.reinitialize()
 
 class NamedConfig(ConfigSet) :
-    def __init__(self,params_space,searcher=GridSearch,max_configs = None):
+    def __init__(self,params_space,searcher=None,max_configs = None):
         super(NamedConfig,self).__init__(params_space,searcher)   
         self.param_grid = []
         key,value = self.config_set
@@ -91,12 +93,13 @@ class NamedConfig(ConfigSet) :
     def reinitialize(self) :
         self.completion_state = Signal.INCOMPLETE
         self.curr_count = 0
+        self.initialize_searcher()
         key,item = self.config_set
         if isinstance(item,ConfigSet) :
             item.reinitialize()
 
 class DictConfig(ConfigSet) :
-    def __init__(self,params_space,searcher=GridSearch,max_configs = None):
+    def __init__(self,params_space,searcher=None,max_configs = None):
         super(DictConfig,self).__init__(params_space,searcher)   
         self.param_grid = []
         for value in self.config_set :
@@ -115,11 +118,12 @@ class DictConfig(ConfigSet) :
     def reinitialize(self) :
         self.completion_state = Signal.INCOMPLETE
         self.curr_count = 0
+        self.initialize_searcher()
         for config in self.config_set :
             config.reinitialize()
 
 class CombinerConfig(ConfigSet) :
-    def __init__(self,params_space,searcher=GridSearch,max_configs = None):
+    def __init__(self,params_space,searcher=None,max_configs = None):
         super(CombinerConfig,self).__init__(params_space,searcher)   
         self.param_grid = []
         for value in self.config_set :
@@ -141,5 +145,6 @@ class CombinerConfig(ConfigSet) :
     def reinitialize(self) :
         self.completion_state = Signal.INCOMPLETE
         self.curr_count = 0
+        self.initialize_searcher()
         for config in self.config_set :
             config.reinitialize()

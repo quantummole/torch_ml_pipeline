@@ -97,7 +97,7 @@ if __name__ == "__main__" :
     final_dim = NamedConfig(("final_conv_dim",8))
     initial_channels = NamedConfig(("initial_channels",1))
     num_classes = NamedConfig(("num_classes",10))
-    conv_module = NamedConfig(("conv_module",ExclusiveConfigs([DoubleConvLayer,InceptionLayer])))
+    conv_module = NamedConfig(("conv_module",ExclusiveConfigs([InceptionLayer])))
     network_params = NamedConfig(("network_params",DictConfig([growth_factor,input_dim,final_dim,initial_channels,num_classes,conv_module])))
 
     train_loader_options = NamedConfig((1,{"shuffle":True,"batch_size":250,"num_workers":4}))
@@ -109,9 +109,9 @@ if __name__ == "__main__" :
     
     network_loader_params = ExclusiveConfigs([network_loader_set1,network_loader_set2,network_loader_set3])
     network = DictConfig([network])    
-    trainer_params = CombinerConfig([network,network_loader_params,optimizers,schedulers,constants])
+    trainer_params = CombinerConfig([network,network_loader_params,optimizers,schedulers,constants],searcher = GridSearch)
     
-    fold_params  = ExclusiveConfigs([{"training_split":0.8,"group_keys":["label"]}])
+    fold_params  = ExclusiveConfigs([{"training_split":0.8,"group_keys":["label"]}],searcher = GridSearch)
     
     train_transform = transforms.Compose([
         transforms.RandomAffine(10,(0.2,0.2),shear=1)
@@ -130,15 +130,15 @@ if __name__ == "__main__" :
                                     [train_transform_options,validation_transform_options])))
 
 
-    dataset_generator = DictConfig([datasets,execution_modes,NamedConfig(("dataset_class",ImageClassificationDataset))])
+    dataset_generator = DictConfig([datasets,execution_modes,NamedConfig(("dataset_class",ImageClassificationDataset))],searcher = GridSearch)
 
     trainer_op = PipelineOp("trainer",Trainer,trainer_params,evaluator_obj)
     datagen_op  = PipelineOp("dataloader_gen",DatasetGenerator,dataset_generator)
     input_block = PipelineOp("folds_generator",StratifiedDeterministicFold,fold_params)
     
-    trainer_block = Pipeline([trainer_op],["datasets"],np.mean,None)
-    datagen_block = Pipeline([datagen_op],["train_dataset","val_dataset","dataset_list"],np.mean,trainer_block)
-    input_block = Pipeline([input_block],["dataset"],np.mean,datagen_block)
+    trainer_block = Pipeline([trainer_op],["datasets"],None,np.mean,None)
+    datagen_block = Pipeline([datagen_op],["train_dataset","val_dataset","dataset_list"],["datasets"],np.mean,trainer_block)
+    input_block = Pipeline([input_block],["dataset"],["train_dataset","val_dataset","dataset_list"],np.mean,datagen_block)
 
     PATH = "../datasets/mnist/testSet"
     import os

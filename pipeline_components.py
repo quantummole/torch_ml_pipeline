@@ -10,11 +10,11 @@ from copy import deepcopy
 import traceback
 
 class Pipeline :
-    def __init__(self,op_set,input_names,score_combiner,pipeline = None) :
+    def __init__(self,op_set,input_names,output_names,score_combiner,pipeline = None) :
         self.op_set = op_set
         self.input_names = input_names
         self.pipeline = pipeline
-        self.output_names = None if not self.pipeline else self.pipeline.input_names
+        self.output_names = output_names
         self.score_combiner = score_combiner
     def __repr__(self) :
         return repr(self.op_set)

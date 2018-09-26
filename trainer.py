@@ -111,7 +111,7 @@ class Trainer :
                 if self.val_max_score >= val_loss :
                     self.val_max_score = val_loss
                     torch.save(self.net.state_dict(),self.model_file)
-                epoch_iters.set_postfix(best_validation_loss =  self.val_max_score , training_loss = train_loss)
+                epoch_iters.set_postfix(best_validation_loss =  self.val_max_score , training_loss = train_loss, config_id = config_id)
         self.infer()
         del self.net
         torch.cuda.empty_cache()
