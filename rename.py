@@ -6,7 +6,7 @@ Created on Thu Sep 27 18:21:33 2018
 """
 from signals import Signal
 class Rename :
-    def __init__(self,input_keys) :
+    def __init__(self,input_keys,evaluator=None) :
         self.input_keys = input_keys
     def execute(self,**kwargs) :
         outputs = []
