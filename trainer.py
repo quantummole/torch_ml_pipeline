@@ -33,7 +33,7 @@ class Trainer :
         self.loader_options = loader_options
         self.Evaluator = evaluator
         self.model_file = self.Evaluator.get_model_file()
-        self.net = self.network(self.network_params).to(self.device)
+        self.net = self.network(**self.network_params).to(self.device)
         self.optimizer = self.optimizer_class(self.net.parameters(),**self.optimizer_params)
         self.scheduler = self.scheduler_class(self.optimizer,**self.scheduler_params)
         self.max_epochs = max_epochs
