@@ -5,6 +5,7 @@ Created on Thu Sep 13 22:05:55 2018
 @author: quantummole
 """
 import torch 
+import torch.nn.functional as tfunc
 
 class SupervisedMetricList :
     def __init__(self,list_list_objective_fn,weights) :
@@ -41,13 +42,37 @@ class Accuracy :
         _,vals = torch.max(predictions,dim=1)
         return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))
 
-class MarginLoss :
-    def __init__(self,num_classes) : 
+class SoftDice :
+    def __init__(self,num_classes,smooth=1) :
         self.num_classes = num_classes
-    def __call__(self,predictions,labels) :
-        one_hot = torch.zeros_like(predictions)
-        one_hot = one_hot.scatter(dim=1,index=labels.view(-1,1),source=1)
-        values = torch.sum(one_hot*predictions,dim=1,keepdim=True)
-        prediction_margins = predictions-values
-        loss  = torch.mean(torch.log(torch.sum(torch.exp(prediction_margins),dim=1)))
-        return loss
+        self.smooth = smooth
+    def __call__(self,logits,mask) :
+        predictions = tfunc.softmax(logits,dim=1)
+        batch_size = predictions.shape[0]
+        score = 0.
+        for cls in range(self.num_classes) :
+            probs = predictions[:,cls,:,:]
+            probs = probs.view(batch_size,-1)
+            label_cls = (mask == cls).view(batch_size,-1).type_as(probs)
+            intersection = 2.*(probs*label_cls).sum(dim=1) + self.smooth
+            union = probs.sum(dim=1) + label_cls.sum(dim=1) + self.smooth
+            score = score + torch.mean((1 - intersection/union))
+        return score
+
+class DiceAccuracy :
+    def __init__(self,num_classes,smooth=1) :
+        self.num_classes = num_classes
+        self.smooth = smooth
+    def __call__(self,logits,mask) :
+        predictions = tfunc.softmax(logits,dim=1).cpu()
+        _,labels = torch.max(predictions,dim=1)
+        batch_size = predictions.shape[0]
+        score = 0.
+        mask = mask.cpu()
+        for cls in range(1,self.num_classes) :
+            probs = (labels == cls).view(batch_size,-1).type_as(predictions)
+            label_cls = (mask == cls).view(batch_size,-1).type_as(predictions)
+            intersection = 2.*(probs*label_cls).sum(dim=1) + self.smooth
+            union = probs.sum(dim=1) + label_cls.sum(dim=1) + self.smooth
+            score = score + torch.mean((1 - intersection/union))
+        return score.type_as(logits)
