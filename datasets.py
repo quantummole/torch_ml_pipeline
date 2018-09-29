@@ -11,7 +11,7 @@ import numpy as np
 from skimage import io
 from PIL import Image
 import torchvision.datasets as datasets
-
+import pydicom
 
 #mode = -1 is for test and debug
 #mode = 0 is for validation
@@ -57,11 +57,15 @@ class ImageClassificationDataset(Dataset) :
         return len(self.image_paths)
     def __getitem__(self,idx) :
         path = self.image_paths[idx]
-        im = io.imread(path)
+        if ".dcm" in path :
+           im = pydicom.read_file(path).pixel_array 
+        else :
+            im = io.imread(path)
         img = Image.fromarray(im)
         if self.transform_sequence :
             img = self.transform_sequence(img)
-        im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
+        im = np.array(img)
+        im = (im/np.max(im)*1.0).astype(np.float32)
         if len(im.shape) == 3 :
             m,n,c = im.shape
             if c < m :
@@ -102,6 +106,52 @@ class ImageSiameseDataset(Dataset) :
                 labels.append(cls)
         return {"inputs":inputs,"ground_truths":labels}
 
+class ImageSegmentationDataset(Dataset) :
+    def __init__(self,data,mode = -1,transform_sequence = None) :
+        super(ImageSegmentationDataset,self).__init__()
+        self.mode = mode
+        self.transform_sequence = transform_sequence
+        self.image_id = data.id.values.tolist()
+        self.image_paths = data.path.values.tolist()
+        if "mask" in data.columns:
+            self.image_mask = data.mask.values.tolist()
+        else :
+            self.image_class = None
+    def __len__(self) :
+        return len(self.image_paths)
+    def __getitem__(self,idx) :
+        path = self.image_paths[idx]
+        if ".dcm" in path :
+           im = pydicom.read_file(path).pixel_array 
+        else :
+            im = io.imread(path)
+        if len(im.shape) == 3 :
+            m,n,c = im.shape
+            if c < m :
+                im = np.transpose(im,(2,0,1))
+        gt = []
+        if self.image_mask :
+            if ".dcm" in path :
+               label = pydicom.read_file(path).pixel_array 
+            else :
+                label = io.imread(path)
+            gt = [label]
+
+        img = Image.fromarray(im)
+        if self.transform_sequence :
+            if self.image_mask :
+                max_l = np.max(gt[0])
+                gt_img = Image.fromarray(gt[0])
+                img,gt_img = self.transform_sequence([img,gt_img])
+                gt = np.array(gt_img)
+                gt = np.clip(gt.round(),0,max_l).astype(np.long)
+                gt = [gt] 
+            else :
+                img = self.transform_sequence(img)
+        im = np.array(img)
+        im = (im/np.max(im)*1.0).astype(np.float32)
+
+        return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
 
 def clean_null(x,y) :
     return x if pd.notnull(x) else y
