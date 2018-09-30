@@ -42,7 +42,7 @@ class ResidualLayer(nn.Module) :
     def __init__(self,in_channels,out_channels,dilation = 1) :
         super(ResidualLayer,self).__init__()
         self.inp = DoubleConvLayer(in_channels,out_channels)
-        self.residual_layer = InceptionLayer(out_channels,out_channels,dilation)
+        self.residual_layer = InceptionLayer(out_channels,out_channels,dilation = dilation)
     def forward(self,x) :
         output = self.inp(x)
         output = self.residual_layer(output)+output
