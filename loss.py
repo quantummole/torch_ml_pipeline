@@ -47,10 +47,12 @@ class MarginLoss :
         pass
     def __call__(self,logits,target) :
         target = target.view(-1,1)
+        logits = logits/logits.norm(dim=1,keepdim=True)
         outputs_onehot = torch.zeros(logits.shape[0],logits.shape[1]).type_as(logits)
         outputs_onehot = outputs_onehot.scatter(1,target,1.0) 
-        predictions = torch.sum(torch.exp(-1*outputs_onehot*logits),dim=1,keepdim=True)*torch.exp(logits) - outputs_onehot
-        return torch.mean(torch.log(1 + predictions.mean(dim=1)))
+        predictions = (  - outputs_onehot).mean(dim=1)
+        predictions =  predictions*(torch.sum(torch.exp(-1*logits)*outputs_onehot,dim=1))
+        return torch.mean(torch.log(1 + predictions))
 
 class SoftDice :
     def __init__(self,num_classes,smooth=1) :
