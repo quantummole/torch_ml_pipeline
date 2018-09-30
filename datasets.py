@@ -116,7 +116,7 @@ class ImageSegmentationDataset(Dataset) :
         if "mask" in data.columns:
             self.image_mask = data.mask.values.tolist()
         else :
-            self.image_class = None
+            self.image_mask = None
     def __len__(self) :
         return len(self.image_paths)
     def __getitem__(self,idx) :
