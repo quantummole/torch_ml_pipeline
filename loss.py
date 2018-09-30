@@ -54,8 +54,10 @@ class SoftDice :
             probs = predictions[:,cls,:,:]
             probs = probs.view(batch_size,-1)
             label_cls = (mask == cls).view(batch_size,-1).type_as(probs)
-            intersection = 2.*(probs*label_cls).sum(dim=1) + self.smooth
-            union = probs.sum(dim=1) + label_cls.sum(dim=1) + self.smooth
+            intersection = (probs*label_cls)
+            union = probs + label_cls - intersection
+            intersection = intersection.sum(dim=1) + self.smooth
+            union = union.sum(dim=1) + self.smooth
             score = score + torch.mean((1 - intersection/union))
         return score
 
@@ -72,7 +74,9 @@ class DiceAccuracy :
         for cls in range(1,self.num_classes) :
             probs = (labels == cls).view(batch_size,-1).type_as(predictions)
             label_cls = (mask == cls).view(batch_size,-1).type_as(predictions)
-            intersection = 2.*(probs*label_cls).sum(dim=1) + self.smooth
-            union = probs.sum(dim=1) + label_cls.sum(dim=1) + self.smooth
+            intersection = (probs*label_cls)
+            union = probs + label_cls - intersection
+            intersection = intersection.sum(dim=1) + self.smooth
+            union = union.sum(dim=1) + self.smooth
             score = score + torch.mean((1 - intersection/union))
         return score.type_as(logits)
