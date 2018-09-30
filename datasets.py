@@ -111,10 +111,10 @@ class ImageSegmentationDataset(Dataset) :
         super(ImageSegmentationDataset,self).__init__()
         self.mode = mode
         self.transform_sequence = transform_sequence
-        self.image_id = data.id.values.tolist()
-        self.image_paths = data.path.values.tolist()
+        self.image_id = data['id'].values.tolist()
+        self.image_paths = data['path'].values.tolist()
         if "mask" in data.columns:
-            self.image_mask = data.mask.values.tolist()
+            self.image_mask = data['mask'].values.tolist()
         else :
             self.image_mask = None
     def __len__(self) :
