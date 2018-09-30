@@ -99,7 +99,7 @@ class CustomNetClassification(nn.Module):
 
 class CustomNetSegmentation(nn.Module):
     def __init__(self, dilation_factors, initial_channels,growth_factor,num_classes,conv_module) :
-        super(CustomNetClassification,self).__init__()
+        super(CustomNetSegmentation,self).__init__()
         self.layer = nn.ModuleList()
         for factor in dilation_factors :
             self.layer.append(conv_module(initial_channels,initial_channels+growth_factor,dilation = factor))
