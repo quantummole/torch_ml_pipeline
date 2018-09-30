@@ -19,6 +19,8 @@ class create_net :
         self.net = net
     def __call__(self,network_params,weights = None) :
         network = nn.DataParallel(self.net(**network_params))
+        if weights :
+            network.load_state_dict(torch.load(weights,map_location=lambda storage, loc: storage))
         return network
 
 class DensenetModels(nn.Module) :
@@ -74,6 +76,35 @@ class CustomNetClassification(nn.Module):
             initial_channels += growth_factor
         num_units = input_dim*input_dim*initial_channels
         self.output_layer = nn.Sequential(nn.Linear(num_units,num_classes))
+        for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                elif isinstance(m, nn.BatchNorm2d):
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)
+                    
+    def forward(self,inputs,mode) :
+        outputs = []
+        for inp in inputs :
+            if len(inp.shape) == 3 :
+                bs,m,n = inp.shape
+                inp = inp.view(bs,1,m,n)
+            bs,c,m,n = inp.shape
+            for layer in self.layer :
+                inp = layer(inp)
+            inp = inp.view(bs,-1)    
+            output = self.output_layer(inp)
+            outputs.append(output)
+        return outputs
+
+class CustomNetSegmentation(nn.Module):
+    def __init__(self, dilation_factors, initial_channels,growth_factor,num_classes,conv_module) :
+        super(CustomNetClassification,self).__init__()
+        self.layer = nn.ModuleList()
+        for factor in dilation_factors :
+            self.layer.append(conv_module(initial_channels,initial_channels+growth_factor,dilation = factor))
+            initial_channels += growth_factor
+        self.output_layer = nn.Sequential(conv_module(initial_channels,num_classes))
         for m in self.modules():
                 if isinstance(m, nn.Conv2d):
                     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
