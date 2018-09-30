@@ -9,16 +9,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tfunc
 import numpy as np
-
 class DoubleConvLayer(nn.Module) :
     def __init__(self,in_channels,out_channels,kernel_size = 3,dilation = 1) :
         super(DoubleConvLayer,self).__init__()
         padding = dilation*(kernel_size - 1)//2
         self.layer = nn.Sequential(nn.Conv2d(in_channels,out_channels,kernel_size = kernel_size,padding=padding,dilation = dilation),
-                                   nn.GroupNorm(np.int(np.ceil(out_channels/4)),out_channels),
+                                   nn.GroupNorm(1,out_channels),
                                    nn.PReLU(),
                                    nn.Conv2d(out_channels,out_channels,kernel_size = kernel_size,padding=padding,dilation = dilation),
-                                   nn.GroupNorm(np.int(np.ceil(out_channels/4)),out_channels),
+                                   nn.GroupNorm(1,out_channels),
                                    nn.PReLU())
     def forward(self,x) :
         return self.layer(x)
