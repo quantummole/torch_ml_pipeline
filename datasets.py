@@ -144,7 +144,7 @@ class ImageSegmentationDataset(Dataset) :
                 gt_img = Image.fromarray(gt[0])
                 img,gt_img = self.transform_sequence([img,gt_img])
                 gt = np.array(gt_img)
-                gt = np.clip(gt.round(),0,max_l).astype(np.long)
+                gt = np.clip(gt.round(),0,max_l).astype(np.int64)
                 gt = [gt] 
             else :
                 img = self.transform_sequence(img)
