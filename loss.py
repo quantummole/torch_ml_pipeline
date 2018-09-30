@@ -42,6 +42,16 @@ class Accuracy :
         _,vals = torch.max(predictions,dim=1)
         return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))
 
+class MarginLoss :
+    def __init__(self) :
+        pass
+    def __call__(self,logits,target) :
+        target = target.view(-1,1)
+        outputs_onehot = torch.zeros(logits.shape[0],logits.shape[1]).type_as(logits)
+        outputs_onehot = outputs_onehot.scatter(1,target,1.0) 
+        predictions = torch.sum(torch.exp(-1*outputs_onehot*logits),dim=1,keepdim=True)*torch.exp(logits) - outputs_onehot
+        return torch.mean(torch.log(1 + predictions.mean(dim=1)))
+
 class SoftDice :
     def __init__(self,num_classes,smooth=1) :
         self.num_classes = num_classes
