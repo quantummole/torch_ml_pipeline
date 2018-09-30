@@ -121,7 +121,5 @@ class CustomNetSegmentation(nn.Module):
             bs,c,m,n = inp.shape
             for layer in self.layer :
                 inp = layer(inp)
-            inp = inp.view(bs,-1)    
-            output = self.output_layer(inp)
             outputs.append(output)
         return outputs
