@@ -50,7 +50,7 @@ class MarginLoss :
         logits = logits/logits.norm(dim=1,keepdim=True)
         outputs_onehot = torch.zeros(logits.shape[0],logits.shape[1]).type_as(logits)
         outputs_onehot = outputs_onehot.scatter(1,target,1.0) 
-        predictions = (torch.exp(logits*(1 - outputs_onehot)) - outputs_onehot).mean(dim=1)
+        predictions = (torch.exp(logits*(1 - outputs_onehot)) - outputs_onehot).mean(dim=1)*logits.shape[1]/(logits.shape[1]-1)
         predictions =  predictions*(torch.sum(torch.exp(-1*logits)*outputs_onehot,dim=1))
         return torch.mean(torch.log(1 + predictions))
 
