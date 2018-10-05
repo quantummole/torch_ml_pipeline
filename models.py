@@ -137,6 +137,7 @@ class CustomNetSegmentation(nn.Module):
                         nn.GroupNorm(1,initial_channels-growth_factor),
                         ))
                 initial_channels  = initial_channels - growth_factor
+            self.final_layer = ResidualBlock(initial_channels)
             self.final_channels = initial_channels
         def forward(self,x,intermediate_outputs) :
             num_intermediates = len(intermediate_outputs)
@@ -147,7 +148,7 @@ class CustomNetSegmentation(nn.Module):
                 x = tfunc.upsample(x,size=(m,n),mode='bilinear',align_corners=True)
                 x = self.compressors[i](x)
                 x = x + upsample_layer
-            return x
+            return self.final_layer(x)
 
 
             
@@ -157,9 +158,7 @@ class CustomNetSegmentation(nn.Module):
         initial_channels = growth_factor
         self.encoder = CustomNetSegmentation.Encoder(depth,initial_channels,growth_factor)        
         self.decoder = CustomNetSegmentation.Decoder(depth,self.encoder.final_channels,growth_factor)
-        self.output_layer = nn.Sequential(
-                ResidualBlock(self.decoder.final_channels),
-                nn.Conv2d(self.decoder.final_channels,num_classes,1))
+        self.output_layer = nn.Conv2d(self.decoder.final_channels,num_classes,1)
         for m in self.modules():
                 if isinstance(m, nn.Conv2d):
                     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
