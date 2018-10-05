@@ -21,7 +21,8 @@ class Trainer :
                  evaluator,
                  max_epochs,
                  objective_fns,
-                 val_max_score=1e+5) :
+                 val_max_score=1e+5,
+                 patience = None) :
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.network = network
         self.network_params = network_params
@@ -39,6 +40,8 @@ class Trainer :
         self.max_epochs = max_epochs
         self.objective_fns = objective_fns
         self.val_max_score = val_max_score
+        self.patience = patience if patience else int(0.2*self.max_epochs)
+        self.patience_counter = 0
     def train(self,mode) :
         self.net.train()
         loss_value = 0
@@ -96,6 +99,7 @@ class Trainer :
                 self.dataloaders[mode] = dataloader.DataLoader(dataset,**get(self.loader_options,mode))
             else :
                 self.dataloaders[mode] = [dataloader.DataLoader(data,**get(self.loader_options,mode)) for data in dataset]
+        best_epoch = -1
         with trange(self.max_epochs,desc="Epochs") as epoch_iters :
             for epoch in epoch_iters :
                 if issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
@@ -110,8 +114,14 @@ class Trainer :
                     self.scheduler.step(val_loss)
                 if self.val_max_score >= val_loss :
                     self.val_max_score = val_loss
+                    best_epoch = epoch
+                    self.patience_counter = 0
                     torch.save(self.net.state_dict(),self.model_file)
-                epoch_iters.set_postfix(best_validation_loss =  self.val_max_score , training_loss = train_loss, config_id = self.Evaluator.config_id)
+                epoch_iters.set_postfix(best_epoch = best_epoch,best_validation_loss =  self.val_max_score , training_loss = train_loss, config_id = self.Evaluator.config_id)
+                if not best_epoch == epoch :
+                    self.patience_counter += 1
+                    if self.patience_counter == self.patience :
+                        break
         self.infer()
         del self.net
         torch.cuda.empty_cache()
