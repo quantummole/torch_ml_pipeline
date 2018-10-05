@@ -8,8 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tfunc
 from torchvision import models
-from model_blocks import DoubleConvLayer
-
+from model_blocks import RecConvLayer, ResidualBlock, InceptionLayer
 #mode = -1 is for debug
 #mode = 0 is for test and validation
 #mode = {1,2,3..} is for training
@@ -61,10 +60,14 @@ class PreTrainedClassifier(nn.Module) :
         super(PreTrainedClassifier,self).__init__()
         self.model = model_class(model)
         self.num_classes = num_classes
-        self.model.update_final_layer(nn.Linear(self.model.final_layer_features,self.num_classes))
+        layer = nn.Sequential(nn.Linear(self.model.final_layer_features,2*self.model.final_layer_features),
+                              nn.ReLU(),
+                              nn.Dropout(),
+                              nn.Linear(2*self.model.final_layer_features,self.num_classes))
+        self.model.update_final_layer(layer)
     def forward(self,inputs,mode) :
         return self.model(inputs,mode)
-   
+
 class CustomNetClassification(nn.Module):
     def __init__(self,input_dim, final_conv_dim, initial_channels,growth_factor,num_classes,conv_module) :
         super(CustomNetClassification,self).__init__()
@@ -98,13 +101,23 @@ class CustomNetClassification(nn.Module):
         return outputs
 
 class CustomNetSegmentation(nn.Module):
-    def __init__(self, dilation_factors, initial_channels,growth_factor,num_classes,conv_module) :
+    def __init__(self, dilation_factors, initial_channels,growth_factor,num_classes) :
         super(CustomNetSegmentation,self).__init__()
         self.layer = nn.ModuleList()
+        self.expanders = nn.ModuleList()
+        self.inp_transformer = nn.Sequential(InceptionLayer(initial_channels,growth_factor))
+        initial_channels = growth_factor
         for factor in dilation_factors :
-            self.layer.append(conv_module(initial_channels,initial_channels+growth_factor,dilation = factor))
-            initial_channels += growth_factor
-        self.output_layer = nn.Sequential(conv_module(initial_channels,num_classes))
+            self.layer.append(nn.Sequential(
+                    ResidualBlock(initial_channels,dilation = factor)))
+            self.expanders.append(nn.Sequential(nn.Conv2d(initial_channels,initial_channels+growth_factor,kernel_size=1),
+                    nn.PReLU(),
+                    nn.GroupNorm(1,initial_channels+growth_factor),
+                    ))
+            initial_channels  = 2*initial_channels + growth_factor
+        self.output_layer = nn.Sequential(
+                nn.GroupNorm(1,initial_channels),
+                nn.Conv2d(initial_channels,num_classes,1))
         for m in self.modules():
                 if isinstance(m, nn.Conv2d):
                     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -119,8 +132,11 @@ class CustomNetSegmentation(nn.Module):
                 bs,m,n = inp.shape
                 inp = inp.view(bs,1,m,n)
             bs,c,m,n = inp.shape
-            for layer in self.layer :
+            inp = self.inp_transformer(inp)
+            for i,layer in enumerate(self.layer) :
                 inp = layer(inp)
+                output = self.expanders[i](inp)
+                inp = torch.cat([inp,output],dim=1)
             output = self.output_layer(inp)
             outputs.append(output)
         return outputs

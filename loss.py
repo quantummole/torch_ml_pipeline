@@ -5,6 +5,7 @@ Created on Thu Sep 13 22:05:55 2018
 @author: quantummole
 """
 import torch 
+import torch.nn as nn
 import torch.nn.functional as tfunc
 
 class SupervisedMetricList :
@@ -41,6 +42,16 @@ class Accuracy :
     def __call__(self,predictions,labels) :
         _,vals = torch.max(predictions,dim=1)
         return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))
+
+class MultiLabelBCE :
+    def __init__(self) :
+        self.loss_fn = nn.BCEWithLogitsLoss()
+    def __call__(self,logits,target) :
+        target = target.view(-1,1)
+        outputs_onehot = torch.zeros(logits.shape[0],logits.shape[1]).type_as(logits)
+        outputs_onehot = outputs_onehot.scatter(1,target,1.0).type_as(logits)
+        loss = self.loss_fn(logits,outputs_onehot)
+        return loss
 
 class MarginLoss :
     def __init__(self) :

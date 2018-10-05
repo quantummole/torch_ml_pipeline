@@ -125,16 +125,16 @@ class ImageSegmentationDataset(Dataset) :
            im = pydicom.read_file(path).pixel_array 
         else :
             im = io.imread(path)
-        if len(im.shape) == 3 :
-            m,n,c = im.shape
-            if c < m :
-                im = np.transpose(im,(2,0,1))
         gt = []
         if self.image_mask :
+            path = self.image_mask[idx]
             if ".dcm" in path :
                label = pydicom.read_file(path).pixel_array 
             else :
                 label = io.imread(path)
+            label = label.astype(np.int64)
+            label = (label/np.max(label+1e-5) > 0)
+            label = label.astype(np.int64)
             gt = [label]
 
         img = Image.fromarray(im)
@@ -149,7 +149,11 @@ class ImageSegmentationDataset(Dataset) :
             else :
                 img = self.transform_sequence(img)
         im = np.array(img)
-        im = (im/np.max(im)*1.0).astype(np.float32)
+        if len(im.shape) == 3 :
+            m,n,c = im.shape
+            if c < m :
+                im = np.transpose(im,(2,0,1))
+        im = (im/np.max(im+1e-5)*1.0).astype(np.float32)
 
         return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
 
