@@ -101,23 +101,65 @@ class CustomNetClassification(nn.Module):
         return outputs
 
 class CustomNetSegmentation(nn.Module):
-    def __init__(self, dilation_factors, initial_channels,growth_factor,num_classes) :
+    class Encoder(nn.Module) :
+        def __init__(self,depth,initial_channels,growth_factor) :
+            super(CustomNetSegmentation.Encoder,self).__init__()
+            self.layer = nn.ModuleList()
+            self.expanders = nn.ModuleList()
+            for i in range(depth) :
+                self.layer.append(nn.Sequential(
+                        ResidualBlock(initial_channels)))
+                self.expanders.append(nn.Sequential(nn.Conv2d(initial_channels,initial_channels+growth_factor,stride=2,kernel_size=3,padding=1),
+                        nn.PReLU(),
+                        nn.GroupNorm(1,initial_channels+growth_factor),
+                        ))
+                initial_channels  = initial_channels + growth_factor
+            self.final_channels = initial_channels
+        def forward(self,x) :
+            intermediate_outputs = []
+            for i,layer in enumerate(self.layer) :
+                x = layer(x)
+                intermediate_outputs.append(x)
+                x = self.expanders[i](x)
+            return x,intermediate_outputs
+
+    class Decoder(nn.Module) :
+        def __init__(self,depth,initial_channels,growth_factor) :
+            super(CustomNetSegmentation.Decoder,self).__init__()
+            self.layer = nn.ModuleList()
+            self.compressors = nn.ModuleList()
+            for i in range(depth) :
+                self.layer.append(nn.Sequential(
+                        ResidualBlock(initial_channels)))
+                self.compressors.append(nn.Sequential(
+                        nn.Conv2d(initial_channels,initial_channels-growth_factor,3,padding=1),
+                        nn.PReLU(),
+                        nn.GroupNorm(1,initial_channels-growth_factor),
+                        ))
+                initial_channels  = initial_channels - growth_factor
+            self.final_channels = initial_channels
+        def forward(self,x,intermediate_outputs) :
+            num_intermediates = len(intermediate_outputs)
+            for i,layer in enumerate(self.layer) :
+                x = layer(x)
+                upsample_layer = intermediate_outputs[num_intermediates -1 -i]
+                bs,c,m,n = upsample_layer.shape
+                x = tfunc.upsample(x,size=(m,n),mode='bilinear',align_corners=True)
+                x = self.compressors[i](x)
+                x = x + upsample_layer
+            return x
+
+
+            
+    def __init__(self, depth, initial_channels,growth_factor,num_classes) :
         super(CustomNetSegmentation,self).__init__()
-        self.layer = nn.ModuleList()
-        self.expanders = nn.ModuleList()
         self.inp_transformer = nn.Sequential(InceptionLayer(initial_channels,growth_factor))
         initial_channels = growth_factor
-        for factor in dilation_factors :
-            self.layer.append(nn.Sequential(
-                    ResidualBlock(initial_channels,dilation = factor)))
-            self.expanders.append(nn.Sequential(nn.Conv2d(initial_channels,initial_channels+growth_factor,kernel_size=1),
-                    nn.PReLU(),
-                    nn.GroupNorm(1,initial_channels+growth_factor),
-                    ))
-            initial_channels  = 2*initial_channels + growth_factor
+        self.encoder = CustomNetSegmentation.Encoder(depth,initial_channels,growth_factor)        
+        self.decoder = CustomNetSegmentation.Decoder(depth,self.encoder.final_channels,growth_factor)
         self.output_layer = nn.Sequential(
-                nn.GroupNorm(1,initial_channels),
-                nn.Conv2d(initial_channels,num_classes,1))
+                ResidualBlock(self.decoder.final_channels),
+                nn.Conv2d(self.decoder.final_channels,num_classes,1))
         for m in self.modules():
                 if isinstance(m, nn.Conv2d):
                     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -133,10 +175,8 @@ class CustomNetSegmentation(nn.Module):
                 inp = inp.view(bs,1,m,n)
             bs,c,m,n = inp.shape
             inp = self.inp_transformer(inp)
-            for i,layer in enumerate(self.layer) :
-                inp = layer(inp)
-                output = self.expanders[i](inp)
-                inp = torch.cat([inp,output],dim=1)
-            output = self.output_layer(inp)
+            x,intermediates = self.encoder(inp)
+            x = self.decoder(x,intermediates)
+            output = self.output_layer(inp+x)
             outputs.append(output)
         return outputs
