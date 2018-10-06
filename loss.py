@@ -57,49 +57,63 @@ class MarginLoss :
     def __init__(self) :
         pass
     def __call__(self,logits,target) :
-        target = target.view(-1,1)
+        target = target.view(logits.shape[0],1,-1)
         logits = logits/logits.norm(dim=1,keepdim=True)
-        outputs_onehot = torch.zeros(logits.shape[0],logits.shape[1]).type_as(logits)
+        logits = logits.view(logits.shape[0],logits.shape[1],-1)
+        outputs_onehot = torch.zeros_like(logits)
         outputs_onehot = outputs_onehot.scatter(1,target,1.0) 
         predictions = (torch.exp(logits*(1 - outputs_onehot)) - outputs_onehot).mean(dim=1)*logits.shape[1]/(logits.shape[1]-1)
         predictions =  predictions*(torch.sum(torch.exp(-1*logits)*outputs_onehot,dim=1))
         return torch.mean(torch.log(1 + predictions))
 
-class SoftDice :
-    def __init__(self,num_classes,smooth=1) :
-        self.num_classes = num_classes
-        self.smooth = smooth
-    def __call__(self,logits,mask) :
+class FocalCELoss :
+    def __init__(self,low=0.01,high=1.2,gamma = 2) :
+        self.low = low
+        self.high = high
+        self.gamma = gamma
+    def __call__(self,logits,target) :
+        logits = logits.view(logits.shape[0],logits.shape[1],-1)
+        outputs_onehot = torch.zeros_like(logits)
+        target = target.view(logits.shape[0],1,-1)
+        outputs_onehot = outputs_onehot.scatter(1,target,1.0) 
         predictions = tfunc.softmax(logits,dim=1)
-        batch_size = predictions.shape[0]
-        score = 0.
-        for cls in range(self.num_classes) :
-            probs = predictions[:,cls,:,:]
-            probs = probs.view(batch_size,-1)
-            label_cls = (mask == cls).view(batch_size,-1).type_as(probs)
-            intersection = (probs*label_cls)
-            union = probs + label_cls - intersection
-            intersection = intersection.sum(dim=1) + self.smooth
-            union = union.sum(dim=1) + self.smooth
-            score = score + torch.mean((1 - intersection/union))
-        return score
+        factor = torch.clamp((1- predictions)/(predictions+ 1e-5),self.low,self.high).pow(self.gamma)
+        loss = (-tfunc.log_softmax(logits,dim=1)*factor*outputs_onehot).sum(dim=1)
+        return torch.mean(loss)
+
+class SoftDice :
+    def __init__(self,smooth=1,low=0.01,high=1.2,gamma = 2) :
+        self.smooth = smooth
+        self.low = low
+        self.high = high
+        self.gamma = gamma
+    def __call__(self,logits,target) :
+        predictions = tfunc.softmax(logits,dim=1)
+        target = target.view(logits.shape[0],1,-1)
+        predictions = predictions.view(logits.shape[0],logits.shape[1],-1)
+        outputs_onehot = torch.zeros_like(predictions)
+        outputs_onehot = outputs_onehot.scatter(1,target,1.0)
+        factor = torch.clamp((1- predictions)/(predictions+ 1e-5),self.low,self.high).pow(self.gamma)
+        intersection = (factor*predictions*outputs_onehot).sum(dim=2)
+        union = (factor*(predictions + outputs_onehot)).sum(dim=2) - intersection
+        loss = 1 - (intersection+self.smooth)/(union+self.smooth)
+        return torch.mean(loss)
 
 class DiceAccuracy :
-    def __init__(self,num_classes,smooth=1) :
-        self.num_classes = num_classes
+    def __init__(self,smooth=1) :
         self.smooth = smooth
-    def __call__(self,logits,mask) :
-        predictions = tfunc.softmax(logits,dim=1).cpu()
-        _,labels = torch.max(predictions,dim=1)
-        batch_size = predictions.shape[0]
-        score = 0.
-        mask = mask.cpu()
-        for cls in range(1,self.num_classes) :
-            probs = (labels == cls).view(batch_size,-1).type_as(predictions)
-            label_cls = (mask == cls).view(batch_size,-1).type_as(predictions)
-            intersection = (probs*label_cls)
-            union = probs + label_cls - intersection
-            intersection = intersection.sum(dim=1) + self.smooth
-            union = union.sum(dim=1) + self.smooth
-            score = score + torch.mean((1 - intersection/union))
-        return score.type_as(logits)
+    def __call__(self,logits,target) :
+        logits = logits.view(logits.shape[0],logits.shape[1],-1)
+        _,predictions = torch.max(logits,dim=1)
+        outputs_onehot = torch.zeros_like(logits)
+        target = target.view(logits.shape[0],1,-1)
+        outputs_onehot = outputs_onehot.scatter(1,target,1.0)
+        predictions = predictions.view(logits.shape[0],1,-1)
+        predictions_onehot = torch.zeros_like(logits)
+        predictions_onehot = predictions_onehot.scatter(1,predictions,1.0)
+        intersection = (predictions_onehot*outputs_onehot).sum(dim=2)
+        union = (predictions_onehot + outputs_onehot).sum(dim=2) - intersection
+        intersection = intersection.type_as(logits)
+        union = union.type_as(logits)
+        loss = 1 - (intersection+self.smooth)/(union+self.smooth)
+        return torch.mean(loss)
