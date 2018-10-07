@@ -9,16 +9,37 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tfunc
 import numpy as np
+
+class SingleConvLayer(nn.Module) :
+    def __init__(self,in_channels,out_channels,kernel_size = 3,dilation = 1, stride=1,padding= 0,activation = nn.PReLU, num_groups = None) :
+        super(SingleConvLayer,self).__init__()
+        padding = dilation*(kernel_size - 1)//2
+        self.gamma = nn.Parameter(torch.ones(1,out_channels,1,1,dtype=torch.float))
+        self.beta = nn.Parameter(torch.zeros(1,out_channels,1,1,dtype=torch.float))
+        self.layer = nn.Sequential(nn.Conv2d(in_channels,out_channels,
+                                             kernel_size = kernel_size,
+                                             padding = padding,
+                                             stride = stride,
+                                             dilation = dilation),
+                                   activation())
+        self.num_groups = num_groups if num_groups else 4       
+        self.eps = 1e-5                
+    def forward(self,x) :
+        output = self.layer(x)
+        bs,c,m,n = output.shape
+        output = output.contiguous().view(bs,self.num_groups,-1)
+        mean = torch.mean(output,dim=2,keepdim=True)
+        std = torch.std(output,dim=2,keepdim=True)
+        output = (output - mean)/(std+self.eps)
+        output = output.contiguous().view(bs,c,m,n)
+        return output
+
 class DoubleConvLayer(nn.Module) :
     def __init__(self,in_channels,out_channels,kernel_size = 3,dilation = 1) :
         super(DoubleConvLayer,self).__init__()
         padding = dilation*(kernel_size - 1)//2
-        self.layer = nn.Sequential(nn.Conv2d(in_channels,out_channels,kernel_size = kernel_size,padding=padding,dilation = dilation),
-                                   nn.PReLU(),
-                                   nn.GroupNorm(1,out_channels),
-                                   nn.Conv2d(out_channels,out_channels,kernel_size = kernel_size,padding=padding,dilation = dilation),
-                                   nn.PReLU(),
-                                   nn.GroupNorm(1,out_channels))
+        self.layer = nn.Sequential(SingleConvLayer(in_channels,out_channels,kernel_size = kernel_size,padding=padding,dilation = dilation),
+                                   SingleConvLayer(out_channels,out_channels,kernel_size = kernel_size,padding=padding,dilation = dilation))
 
     def forward(self,x) :
         return self.layer(x)
@@ -30,7 +51,7 @@ class InceptionLayer(nn.Module) :
         self.layers = nn.ModuleList()
         for ksize in kernel_sizes :
             self.layers.append(DoubleConvLayer(in_channels,intermed_channels,ksize,dilation))
-        self.output_layer = nn.Sequential(DoubleConvLayer(len(kernel_sizes)*intermed_channels,out_channels,1))
+        self.output_layer = SingleConvLayer(len(kernel_sizes)*intermed_channels,out_channels,kernel_size=1)
     def forward(self,x) :
         outputs = []
         for layer in self.layers :
@@ -47,7 +68,7 @@ class DenseBlock(nn.Module) :
         for i in range(num_layers) :
             self.dense_layers.append(InceptionLayer(init_layers,in_channels,dilation=dilation))
             init_layers += in_channels
-        self.out_layer = nn.Conv2d(init_layers,out_channels,kernel_size=1)
+        self.out_layer = SingleConvLayer(init_layers,out_channels,kernel_size=1)
     def forward(self,x) :
         for layer in self.dense_layers :
             output = layer(x)
@@ -58,30 +79,22 @@ class DenseBlock(nn.Module) :
 class ResidualBlock(nn.Module) :
     def __init__(self,out_channels,dilation = 1,num_layers = 2) :
         super(ResidualBlock,self).__init__()
-        self.bottle_neck = nn.Sequential(nn.Conv2d(out_channels,out_channels//4,1),
-                                         nn.PReLU(),
-                                         nn.GroupNorm(1,out_channels//4))
+        self.bottle_neck = SingleConvLayer(out_channels,out_channels//4,kernel_size = 1)
         self.residual_layer = DenseBlock(out_channels//4,out_channels//4,dilation = dilation,num_layers = num_layers)
-        self.expand_neck = nn.Sequential(nn.Conv2d(out_channels//4,out_channels,1),
-                                         nn.PReLU())
-        self.nl = nn.GroupNorm(1,out_channels)
+        self.expand_neck = SingleConvLayer(out_channels//4,out_channels,kernel_size=1)
     def forward(self,x) :
         output = self.bottle_neck(x)
         output = self.residual_layer(output)
         output = self.expand_neck(output)
         output = output + x
-        return self.nl(output)
+        return output
 
 class HighwayBlock(nn.Module) :
     def __init__(self,out_channels,dilation = 1,num_layers = 2) :
         super(HighwayBlock,self).__init__()
-        self.bottle_neck = nn.Sequential(nn.Conv2d(out_channels,out_channels//4,1),
-                                         nn.PReLU(),
-                                         nn.GroupNorm(1,out_channels//4))
+        self.bottle_neck = SingleConvLayer(out_channels,out_channels//4,kernel_size=1)
         self.residual_layer = DenseBlock(out_channels//4,out_channels//4,dilation = dilation,num_layers = num_layers)
-        self.expand_neck = nn.Sequential(nn.Conv2d(out_channels//4,out_channels,1),
-                                         nn.PReLU(),
-                                         nn.GroupNorm(1,out_channels))
+        self.expand_neck = SingleConvLayer(out_channels//4,out_channels,kernel_size = 1)
         self.highway_connection = nn.Sequential(nn.Conv2d(2*out_channels,1,kernel_size=1))
     def forward(self,x) :
         output = self.bottle_neck(x)

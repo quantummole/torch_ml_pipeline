@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tfunc
 from torchvision import models
-from model_blocks import RecConvLayer, ResidualBlock, InceptionLayer
+from model_blocks import RecConvLayer, ResidualBlock, InceptionLayer, SingleConvLayer
 #mode = -1 is for debug
 #mode = 0 is for test and validation
 #mode = {1,2,3..} is for training
@@ -109,10 +109,7 @@ class CustomNetSegmentation(nn.Module):
             for i in range(depth) :
                 self.layer.append(nn.Sequential(
                         ResidualBlock(initial_channels)))
-                self.expanders.append(nn.Sequential(nn.Conv2d(initial_channels,initial_channels+growth_factor,stride=2,kernel_size=3,padding=1),
-                        nn.PReLU(),
-                        nn.GroupNorm(1,initial_channels+growth_factor),
-                        ))
+                self.expanders.append(SingleConvLayer(initial_channels,initial_channels+growth_factor,stride=2,kernel_size=3,padding=1))
                 initial_channels  = initial_channels + growth_factor
             self.final_channels = initial_channels
         def forward(self,x) :
@@ -131,11 +128,7 @@ class CustomNetSegmentation(nn.Module):
             for i in range(depth) :
                 self.layer.append(nn.Sequential(
                         ResidualBlock(initial_channels)))
-                self.compressors.append(nn.Sequential(
-                        nn.Conv2d(initial_channels,initial_channels-growth_factor,3,padding=1),
-                        nn.PReLU(),
-                        nn.GroupNorm(1,initial_channels-growth_factor),
-                        ))
+                self.compressors.append(SingleConvLayer(initial_channels,initial_channels-growth_factor,3,padding=1))
                 initial_channels  = initial_channels - growth_factor
             self.final_layer = ResidualBlock(initial_channels)
             self.final_channels = initial_channels
