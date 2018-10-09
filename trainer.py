@@ -52,7 +52,7 @@ class Trainer :
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                 debug_info = sample_batch['debug_info']
                 self.optimizer.zero_grad()
-                outputs = self.net(inputs,mode)
+                outputs = self.net(inputs=inputs,mode=mode)
                 loss = self.objective_fns[mode](outputs,ground_truths)
                 loss.backward()
                 grads.append(torch.abs(inputs[0].grad).mean().item())
@@ -70,7 +70,7 @@ class Trainer :
                     inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                     debug_info = sample_batch['debug_info']
-                    outputs = self.net(inputs,mode=0)
+                    outputs = self.net(inputs=inputs,mode=0)
                     score += self.objective_fns[0](outputs,ground_truths).item()
                     loader.set_postfix(score=(score/(i_batch+1)))
                 score = score/(i_batch+1)
@@ -86,7 +86,7 @@ class Trainer :
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                     debug_info = sample_batch['debug_info']
                     outputs = []
-                    outputs = self.net(inputs,mode=0)
+                    outputs = self.net(inputs=inputs,mode=0)
                     self.Evaluator.log("inference",data_id,[output.detach().cpu() for output in outputs],[gt.detach().cpu() for gt in ground_truths],debug_info)
 
     def execute(self,datasets) :
@@ -117,11 +117,11 @@ class Trainer :
                     best_epoch = epoch
                     self.patience_counter = 0
                     torch.save(self.net.state_dict(),self.model_file)
-                epoch_iters.set_postfix(best_epoch = best_epoch,best_validation_loss =  self.val_max_score , training_loss = train_loss, config_id = self.Evaluator.config_id)
                 if not best_epoch == epoch :
                     self.patience_counter += 1
                     if self.patience_counter == self.patience :
                         break
+                epoch_iters.set_postfix(best_epoch = best_epoch,best_validation_loss =  self.val_max_score , training_loss = train_loss, config_id = self.Evaluator.config_id)
         self.infer()
         del self.net
         torch.cuda.empty_cache()

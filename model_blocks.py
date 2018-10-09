@@ -9,29 +9,27 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tfunc
 import numpy as np
-
+import random
 class SingleConvLayer(nn.Module) :
-    def __init__(self,in_channels,out_channels,kernel_size = 3,dilation = 1, stride=1,padding= 0,activation = nn.PReLU, num_groups = None) :
+    def __init__(self,in_channels,out_channels,kernel_size = 3,dilation = 1, stride=1,padding= 0,activation = nn.PReLU, num_groups = None, noise_prob = 0.2) :
         super(SingleConvLayer,self).__init__()
         padding = dilation*(kernel_size - 1)//2
-        self.gamma = nn.Parameter(torch.ones(1,out_channels,1,1,dtype=torch.float))
-        self.beta = nn.Parameter(torch.zeros(1,out_channels,1,1,dtype=torch.float))
+        self.num_groups = num_groups if num_groups else 8 if out_channels % 8 ==0 else 4 if out_channels % 4 ==0 else 2 if out_channels % 2 ==0 else 1 
+        self.eps = 1e-5
+
         self.layer = nn.Sequential(nn.Conv2d(in_channels,out_channels,
                                              kernel_size = kernel_size,
                                              padding = padding,
                                              stride = stride,
                                              dilation = dilation),
-                                   activation())
-        self.num_groups = num_groups if num_groups else 4       
-        self.eps = 1e-5                
+                                   activation(),
+                                   nn.GroupNorm(self.num_groups,out_channels))
+        self.noise_prob = noise_prob                
     def forward(self,x) :
         output = self.layer(x)
-        bs,c,m,n = output.shape
-        output = output.contiguous().view(bs,self.num_groups,-1)
-        mean = torch.mean(output,dim=2,keepdim=True)
-        std = torch.std(output,dim=2,keepdim=True)
-        output = (output - mean)/(std+self.eps)
-        output = output.contiguous().view(bs,c,m,n)
+        if self.training :
+            if random.random() < self.noise_prob :
+                output = output + 0.5*torch.randn_like(output)
         return output
 
 class DoubleConvLayer(nn.Module) :

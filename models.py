@@ -151,7 +151,15 @@ class CustomNetSegmentation(nn.Module):
         initial_channels = growth_factor
         self.encoder = CustomNetSegmentation.Encoder(depth,initial_channels,growth_factor)        
         self.decoder = CustomNetSegmentation.Decoder(depth,self.encoder.final_channels,growth_factor)
-        self.output_layer = nn.Conv2d(self.decoder.final_channels,num_classes,1)
+        self.output_layer = nn.Sequential(
+                ResidualBlock(self.decoder.final_channels)
+                ,SingleConvLayer(self.decoder.final_channels,num_classes,1,num_groups=1,noise_prob=0))
+        self.encoder1 = CustomNetSegmentation.Encoder(depth,self.decoder.final_channels + num_classes,growth_factor)        
+        self.decoder1 = CustomNetSegmentation.Decoder(depth,self.encoder1.final_channels,growth_factor)
+        self.output_layer1 = nn.Sequential(
+                ResidualBlock(self.decoder1.final_channels)
+                ,SingleConvLayer(self.decoder1.final_channels,num_classes,1,num_groups=1,noise_prob=0))
+
         for m in self.modules():
                 if isinstance(m, nn.Conv2d):
                     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -169,6 +177,16 @@ class CustomNetSegmentation(nn.Module):
             inp = self.inp_transformer(inp)
             x,intermediates = self.encoder(inp)
             x = self.decoder(x,intermediates)
-            output = self.output_layer(inp+x)
+            inp = inp + x
+            output = self.output_layer(inp)
             outputs.append(output)
+
+            inp = torch.cat([output,inp],dim=1)
+            x,intermediates = self.encoder1(inp)
+            x = self.decoder1(x,intermediates)
+            inp = inp + x
+            output = self.output_layer1(inp) + output
+            outputs.append(output)
+            if mode < 1 :
+                outputs = outputs[1:]
         return outputs

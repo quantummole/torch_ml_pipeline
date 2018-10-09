@@ -137,18 +137,20 @@ class ImageSegmentationDataset(Dataset) :
             label = label.astype(np.int64)
             gt = [label]
 
-        img = Image.fromarray(im)
+        img = im
         if self.transform_sequence :
             if self.image_mask :
                 max_l = np.max(gt[0])
-                gt_img = Image.fromarray(gt[0])
+                gt_img = gt[0]
                 img,gt_img = self.transform_sequence([img,gt_img])
                 gt = np.array(gt_img)
                 gt = np.clip(gt.round(),0,max_l).astype(np.int64)
-                gt = [gt] 
+                gt = [gt,gt] 
+                if self.mode < 1 :
+                    gt = gt[1:]
             else :
                 img = self.transform_sequence(img)
-        im = np.array(img)
+        im = img
         if len(im.shape) == 3 :
             m,n,c = im.shape
             if c < m :
