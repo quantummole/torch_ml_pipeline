@@ -93,7 +93,7 @@ class HighwayBlock(nn.Module) :
         self.bottle_neck = SingleConvLayer(out_channels,out_channels//4,kernel_size=1)
         self.residual_layer = DenseBlock(out_channels//4,out_channels//4,dilation = dilation,num_layers = num_layers)
         self.expand_neck = SingleConvLayer(out_channels//4,out_channels,kernel_size = 1)
-        self.highway_connection = nn.Sequential(nn.Conv2d(2*out_channels,1,kernel_size=1))
+        self.highway_connection = nn.Sequential(nn.Conv2d(2*out_channels,out_channels,kernel_size=1))
     def forward(self,x) :
         output = self.bottle_neck(x)
         output = self.residual_layer(output)
