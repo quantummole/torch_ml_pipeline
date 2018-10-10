@@ -116,7 +116,7 @@ class RecConvLayer(nn.Module) :
             self.horizontal_layer.append(nn.GRU(input_size=out_channels,hidden_size=out_channels,num_layers=2,bidirectional=True))
             self.vertical1_layer.append(nn.GRU(input_size=out_channels,hidden_size=out_channels,num_layers=2,bidirectional=True))
             self.vertical_layer.append(nn.GRU(input_size=out_channels,hidden_size=out_channels,num_layers=2,bidirectional=True))
-        self.final_comb = nn.Conv2d(2*out_channels,out_channels,kernel_size=1)
+        self.final_comb = SingleConvLayer(2*out_channels,out_channels,kernel_size=1)
     def forward(self,x) :
         x = self.conv_layer(x)
         bs,c,m,n = x.shape
