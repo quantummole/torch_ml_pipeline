@@ -53,10 +53,7 @@ class MultiLabelBCE(nn.Module) :
         super(MultiLabelBCE,self).__init__()
         self.loss_fn = nn.BCEWithLogitsLoss()
     def forward(self,logits,target) :
-        target = target.view(-1,1)
-        outputs_onehot = torch.zeros(logits.shape[0],logits.shape[1]).type_as(logits)
-        outputs_onehot = outputs_onehot.scatter(1,target,1.0).type_as(logits)
-        loss = self.loss_fn(logits,outputs_onehot)
+        loss = self.loss_fn(logits,target)
         return loss
 
 class MarginLoss(nn.Module) :
