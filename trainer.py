@@ -12,6 +12,7 @@ from torch.utils.data import dataloader
 import numpy as np
 from tqdm import tqdm, trange
 from signals import Signal
+from functools import reduce
 
 class Trainer :
     def __init__(self,network,network_params,
@@ -33,12 +34,14 @@ class Trainer :
         self.modes = modes
         self.loader_options = loader_options
         self.Evaluator = evaluator
+        self.objective_fns = objective_fns
         self.model_file = self.Evaluator.get_model_file()
         self.net = self.network(**self.network_params).to(self.device)
-        self.optimizer = self.optimizer_class(self.net.parameters(),**self.optimizer_params)
+        objective_fn_params = [list(fn.parameters()) for key,fn in self.objective_fns.items()]
+        objective_fn_params = reduce(lambda x,y : x+y,objective_fn_params)
+        self.optimizer = self.optimizer_class(list(self.net.parameters())+objective_fn_params,**self.optimizer_params)
         self.scheduler = self.scheduler_class(self.optimizer,**self.scheduler_params)
         self.max_epochs = max_epochs
-        self.objective_fns = objective_fns
         self.val_max_score = val_max_score
         self.patience = patience if patience else int(0.2*self.max_epochs)
         self.patience_counter = 0

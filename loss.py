@@ -8,13 +8,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tfunc
 
-class SupervisedMetricList :
+class SupervisedMetricList(nn.Module) :
     def __init__(self,list_list_objective_fn,weights) :
-        self.objective_fn = list_list_objective_fn
+        super(SupervisedMetricList,self).__init__()
+        self.objective_fn = nn.ModuleList()
+        for l in list_list_objective_fn :
+            self.objective_fn.append(nn.ModuleList(modules=l))
         self.weights = weights
     def __repr__(self) :
         return repr(self.objective_fn)
-    def __call__(self,predictions,labels):
+    def forward(self,predictions,labels):
         loss = 0
         num_outputs = len(predictions)
         for i in range(num_outputs) :
@@ -22,11 +25,12 @@ class SupervisedMetricList :
                 loss +=  self.weights[i][j]*self.objective_fn[i][j](predictions[i],labels[i])/num_outputs
         return loss
  
-class SiameseLossList :
+class SiameseLossList(nn.Module) :
     def __init__(self,list_loss_fn,weights) :
-        self.loss_fn = list_loss_fn
+        super(SiameseLossList,self).__init__()
+        self.loss_fn = nn.ModuleList(modules=list_loss_fn)
         self.weights = weights
-    def __call__(self,predictions,labels):
+    def forward(self,predictions,labels):
         loss = 0
         num_classes = len(predictions)//2
         for i in range(len(self.loss_fn)) :
@@ -37,26 +41,28 @@ class SiameseLossList :
                 loss +=  self.weights[i]*self.loss_fn[i](positives,anchors,negatives)/num_classes
         return loss    
 
-class Accuracy :
-    def __init__(self) : pass
-    def __call__(self,predictions,labels) :
+class Accuracy(nn.Module) :
+    def __init__(self) :
+        super(Accuracy,self).__init__()
+    def forward(self,predictions,labels) :
         _,vals = torch.max(predictions,dim=1)
         return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))
 
-class MultiLabelBCE :
+class MultiLabelBCE(nn.Module) :
     def __init__(self) :
+        super(MultiLabelBCE,self).__init__()
         self.loss_fn = nn.BCEWithLogitsLoss()
-    def __call__(self,logits,target) :
+    def forward(self,logits,target) :
         target = target.view(-1,1)
         outputs_onehot = torch.zeros(logits.shape[0],logits.shape[1]).type_as(logits)
         outputs_onehot = outputs_onehot.scatter(1,target,1.0).type_as(logits)
         loss = self.loss_fn(logits,outputs_onehot)
         return loss
 
-class MarginLoss :
+class MarginLoss(nn.Module) :
     def __init__(self) :
-        pass
-    def __call__(self,logits,target) :
+        super(MarginLoss,self).__init__()
+    def forward(self,logits,target) :
         target = target.view(logits.shape[0],1,-1)
         logits = logits/logits.norm(dim=1,keepdim=True)
         logits = logits.view(logits.shape[0],logits.shape[1],-1)
@@ -66,12 +72,13 @@ class MarginLoss :
         predictions =  predictions*(torch.sum(torch.exp(-1*logits)*outputs_onehot,dim=1))
         return torch.mean(torch.log(1 + predictions))
 
-class FocalCELoss :
+class FocalCELoss(nn.Module) :
     def __init__(self,low=0.01,high=1.2,gamma = 2) :
+        super(FocalCELoss,self).__init__()
         self.low = low
         self.high = high
         self.gamma = gamma
-    def __call__(self,logits,target) :
+    def forward(self,logits,target) :
         logits = logits.view(logits.shape[0],logits.shape[1],-1)
         outputs_onehot = torch.zeros_like(logits)
         target = target.view(logits.shape[0],1,-1)
@@ -81,13 +88,14 @@ class FocalCELoss :
         loss = (-tfunc.log_softmax(logits,dim=1)*factor*outputs_onehot).sum(dim=1)
         return torch.mean(loss)
 
-class SoftDice :
+class SoftDice(nn.Module) :
     def __init__(self,smooth=1,low=0.01,high=1.2,gamma = 2) :
+        super(SoftDice,self).__init__()
         self.smooth = smooth
         self.low = low
         self.high = high
         self.gamma = gamma
-    def __call__(self,logits,target) :
+    def forward(self,logits,target) :
         predictions = tfunc.softmax(logits,dim=1)
         target = target.view(logits.shape[0],1,-1)
         predictions = predictions.view(logits.shape[0],logits.shape[1],-1)
@@ -99,10 +107,11 @@ class SoftDice :
         loss = 1 - (intersection+self.smooth)/(union+self.smooth)
         return torch.mean(loss)
 
-class DiceAccuracy :
+class DiceAccuracy(nn.Module) :
     def __init__(self,smooth=1) :
+        super(DiceAccuracy,self).__init__()
         self.smooth = smooth
-    def __call__(self,logits,target) :
+    def forward(self,logits,target) :
         logits = logits.view(logits.shape[0],logits.shape[1],-1)
         _,predictions = torch.max(logits,dim=1)
         outputs_onehot = torch.zeros_like(logits)
