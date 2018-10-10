@@ -47,6 +47,7 @@ class Trainer :
         self.patience_counter = 0
     def train(self,mode) :
         self.net.train()
+        self.objective_fns[mode].train()
         loss_value = 0
         grads = []
         with tqdm(self.dataloaders[mode],desc = "Training Epoch") as loader :
@@ -67,6 +68,7 @@ class Trainer :
     def validate(self) :
         with torch.no_grad():
             self.net.eval()
+            self.objective_fns[0].train()
             score = 0
             with tqdm(self.dataloaders[0],desc="Evaluation Epoch") as loader :
                 for i_batch,sample_batch in enumerate(loader) :
