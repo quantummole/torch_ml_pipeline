@@ -119,7 +119,6 @@ class CustomNetSegmentation(nn.Module):
                 intermediate_outputs.append(x)
                 x = self.expanders[i](x)
             return x,intermediate_outputs
-
     class Decoder(nn.Module) :
         def __init__(self,depth,initial_channels,growth_factor) :
             super(CustomNetSegmentation.Decoder,self).__init__()
@@ -141,10 +140,7 @@ class CustomNetSegmentation(nn.Module):
                 x = tfunc.upsample(x,size=(m,n),mode='bilinear',align_corners=True)
                 x = self.compressors[i](x)
                 x = x + upsample_layer
-            return self.final_layer(x)
-
-
-            
+            return self.final_layer(x)            
     def __init__(self, depth, initial_channels,growth_factor,num_classes) :
         super(CustomNetSegmentation,self).__init__()
         self.inp_transformer = nn.Sequential(InceptionLayer(initial_channels,growth_factor))
@@ -165,8 +161,7 @@ class CustomNetSegmentation(nn.Module):
                     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 elif isinstance(m, nn.BatchNorm2d):
                     nn.init.constant_(m.weight, 1)
-                    nn.init.constant_(m.bias, 0)
-                    
+                    nn.init.constant_(m.bias, 0)                   
     def forward(self,inputs,mode) :
         outputs = []
         for inp in inputs :
@@ -187,6 +182,105 @@ class CustomNetSegmentation(nn.Module):
             inp = inp + x
             output = self.output_layer1(inp) + output
             outputs.append(output)
+            if mode < 1 :
+                outputs = outputs[1:]
+        return outputs
+
+
+class CustomNetVideoSegmentation(nn.Module):
+    class Encoder(nn.Module) :
+        def __init__(self,depth,initial_channels,growth_factor) :
+            super(CustomNetVideoSegmentation.Encoder,self).__init__()
+            self.layer = nn.ModuleList()
+            self.expanders = nn.ModuleList()
+            for i in range(depth) :
+                self.layer.append(nn.Sequential(
+                        ResidualBlock(initial_channels)))
+                self.expanders.append(SingleConvLayer(initial_channels,initial_channels+growth_factor,stride=2,kernel_size=3,padding=1))
+                initial_channels  = initial_channels + growth_factor
+            self.final_channels = initial_channels
+        def forward(self,x) :
+            intermediate_outputs = []
+            for i,layer in enumerate(self.layer) :
+                x = layer(x)
+                intermediate_outputs.append(x)
+                x = self.expanders[i](x)
+            return x,intermediate_outputs
+    class Decoder(nn.Module) :
+        def __init__(self,depth,initial_channels,growth_factor) :
+            super(CustomNetVideoSegmentation.Decoder,self).__init__()
+            self.layer = nn.ModuleList()
+            self.compressors = nn.ModuleList()
+            for i in range(depth) :
+                self.layer.append(nn.Sequential(
+                        ResidualBlock(initial_channels)))
+                self.compressors.append(SingleConvLayer(initial_channels,initial_channels-growth_factor,3,padding=1))
+                initial_channels  = initial_channels - growth_factor
+            self.final_layer = ResidualBlock(initial_channels)
+            self.final_channels = initial_channels
+        def forward(self,x,intermediate_outputs) :
+            num_intermediates = len(intermediate_outputs)
+            for i,layer in enumerate(self.layer) :
+                x = layer(x)
+                upsample_layer = intermediate_outputs[num_intermediates -1 -i]
+                bs,c,m,n = upsample_layer.shape
+                x = tfunc.upsample(x,size=(m,n),mode='bilinear',align_corners=True)
+                x = self.compressors[i](x)
+                x = x + upsample_layer
+            return self.final_layer(x)            
+    def __init__(self, depth, initial_channels,growth_factor,num_classes) :
+        super(CustomNetVideoSegmentation,self).__init__()
+        self.inp_transformer = nn.Sequential(InceptionLayer(initial_channels,growth_factor))
+        initial_channels = growth_factor
+        self.encoder = CustomNetSegmentation.Encoder(depth,initial_channels,growth_factor)        
+        self.decoder = CustomNetSegmentation.Decoder(depth,self.encoder.final_channels,growth_factor)
+        self.output_layer = nn.Sequential(
+                ResidualBlock(self.decoder.final_channels)
+                ,SingleConvLayer(self.decoder.final_channels,num_classes,1,num_groups=1,noise_prob=0))
+        self.encoder1 = CustomNetSegmentation.Encoder(depth,self.decoder.final_channels + num_classes,growth_factor)        
+        self.decoder1 = CustomNetSegmentation.Decoder(depth,self.encoder1.final_channels,growth_factor)
+        self.output_layer1 = nn.Sequential(
+                ResidualBlock(self.decoder1.final_channels)
+                ,SingleConvLayer(self.decoder1.final_channels,num_classes,1,num_groups=1,noise_prob=0))
+        self.input_gate = nn.Sequential(SingleConvLayer(2*self.encoder1.final_channels,self.encoder1.final_channels,1,num_groups=1,noise_prob=0),
+                                        nn.Sigmoid())
+        for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                elif isinstance(m, nn.BatchNorm2d):
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)                   
+    def forward(self,inputs,mode) :
+        outputs = []
+        for inpf in inputs :
+            if len(inpf.shape) == 4 :
+                bs,f,m,n = inpf.shape
+                inpf = inpf.view(bs,f,1,m,n)
+            bs,f,c,m,n = inpf.shape
+            prev = 0
+            outputs2d = []
+            outputsf = []
+            for i in range(f) :
+                inp = inpf[:,i,:,:,:]
+                inp = self.inp_transformer(inp)
+                x,intermediates = self.encoder(inp)
+                x = self.decoder(x,intermediates)
+                inp = inp + x
+                output = self.output_layer(inp)
+                outputs2d.append(output)
+                inp = torch.cat([output,inp],dim=1)
+                x,intermediates = self.encoder1(inp)
+                if not i == 0 :
+                    gate = self.input_gate(torch.cat([prev,x],dim=1))
+                    x = gate*x + (1-gate)*prev
+                    prev = x
+                x = self.decoder1(x,intermediates)
+                inp = inp + x
+                output = self.output_layer1(inp) + output
+                outputsf.append(output)
+            outputsf = torch.stack(outputsf,dim=1)
+            outputs2d = torch.stack(outputs2d,dim=1)
+            outputs.append([outputs2d,outputsf])
             if mode < 1 :
                 outputs = outputs[1:]
         return outputs

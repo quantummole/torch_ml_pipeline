@@ -17,6 +17,14 @@ import pydicom
 #mode = 0 is for validation
 #mode = {1,2,3..} is for training
 
+def im_reader(path) :
+    if ".dcm" in path :
+       im = pydicom.read_file(path).pixel_array 
+    else :
+        im = io.imread(path) 
+    im = im/(np.max(im)+1e-5)
+    return im
+
 from signals import Signal
 class DatasetGenerator :
     def __init__(self,execution_modes,dataset_class,dataset_class_params,evaluator = None) :
@@ -43,7 +51,7 @@ class DatasetGenerator :
         return Signal.COMPLETE,[datasets]
 
 class ImageClassificationDataset(Dataset) :
-    def __init__(self,data,mode = -1,transform_sequence = None) :
+    def __init__(self,data,mode = -1,reader = im_reader,transform_sequence = None) :
         super(ImageClassificationDataset,self).__init__()
         self.mode = mode
         self.transform_sequence = transform_sequence
@@ -53,14 +61,12 @@ class ImageClassificationDataset(Dataset) :
             self.image_class = data.label.values.tolist()
         else :
             self.image_class = None
+        self.reader = reader
     def __len__(self) :
         return len(self.image_paths)
     def __getitem__(self,idx) :
         path = self.image_paths[idx]
-        if ".dcm" in path :
-           im = pydicom.read_file(path).pixel_array 
-        else :
-            im = io.imread(path)
+        im = self.reader(path)
         img = Image.fromarray(im)
         if self.transform_sequence :
             img = self.transform_sequence(img)
@@ -77,7 +83,7 @@ class ImageClassificationDataset(Dataset) :
         return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
 
 class ImageSiameseDataset(Dataset) :
-    def __init__(self,data,classes_per_sample,mode = -1,transform_sequence = None) :
+    def __init__(self,data,classes_per_sample,mode = -1,reader = im_reader,transform_sequence = None) :
         super(ImageSiameseDataset,self).__init__()
         self.data_groups = data.groupby(["label"])
         self.groups = list(self.data_groups.groups.keys())
@@ -88,6 +94,7 @@ class ImageSiameseDataset(Dataset) :
         self.transform_sequence = transform_sequence
         self.classes_per_sample = classes_per_sample
         self.mode = mode
+        self.reader = reader
     def __len__(self) :
         return np.min(self.group_counts)
     def __getitem__(self,idx) :
@@ -97,7 +104,7 @@ class ImageSiameseDataset(Dataset) :
         for cls in classes :
             paths = np.random.choice(self.data_groups.get_group(cls)["path"].values,size=2,replace=False)
             for path in paths :
-                im = io.imread(path)
+                im = self.reader(path)
                 img = Image.fromarray(im)
                 if self.transform_sequence :
                     img = self.transform_sequence(img)
@@ -107,7 +114,7 @@ class ImageSiameseDataset(Dataset) :
         return {"inputs":inputs,"ground_truths":labels}
 
 class ImageSegmentationDataset(Dataset) :
-    def __init__(self,data,mode = -1,transform_sequence = None) :
+    def __init__(self,data,mode = -1,image_reader=im_reader,mask_reader=im_reader,transform_sequence = None) :
         super(ImageSegmentationDataset,self).__init__()
         self.mode = mode
         self.transform_sequence = transform_sequence
@@ -117,26 +124,19 @@ class ImageSegmentationDataset(Dataset) :
             self.image_mask = data['mask'].values.tolist()
         else :
             self.image_mask = None
+        self.image_reader = image_reader
+        self.mask_reader = mask_reader
     def __len__(self) :
         return len(self.image_paths)
     def __getitem__(self,idx) :
         path = self.image_paths[idx]
-        if ".dcm" in path :
-           im = pydicom.read_file(path).pixel_array 
-        else :
-            im = io.imread(path)
+        im = self.image_reader(path)
         gt = []
         if self.image_mask :
             path = self.image_mask[idx]
-            if ".dcm" in path :
-               label = pydicom.read_file(path).pixel_array 
-            else :
-                label = io.imread(path)
-            label = label.astype(np.int64)
-            label = (label/np.max(label+1e-5) > 0)
+            label = self.mask_reader(path)
             label = label.astype(np.int64)
             gt = [label]
-
         img = im
         if self.transform_sequence :
             if self.image_mask :
@@ -161,7 +161,7 @@ class ImageSegmentationDataset(Dataset) :
 
 def clean_null(x,y) :
     return x if pd.notnull(x) else y
- 
+
 def create_csv_file(root_dir) :
     dataset =  datasets.ImageFolder(root_dir)
     z = dataset.imgs
