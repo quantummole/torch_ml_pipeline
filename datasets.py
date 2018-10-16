@@ -66,16 +66,11 @@ class ImageClassificationDataset(Dataset) :
         return len(self.image_paths)
     def __getitem__(self,idx) :
         path = self.image_paths[idx]
-        im = self.reader(path)
-        img = Image.fromarray(im)
+        img = self.reader(path)
         if self.transform_sequence :
             img = self.transform_sequence(img)
         im = np.array(img)
         im = (im/np.max(im)*1.0).astype(np.float32)
-        if len(im.shape) == 3 :
-            m,n,c = im.shape
-            if c < m :
-                im = np.transpose(im,(2,0,1))
         gt = []
         if self.image_class :
             label = np.long(self.image_class[idx])
@@ -104,11 +99,10 @@ class ImageSiameseDataset(Dataset) :
         for cls in classes :
             paths = np.random.choice(self.data_groups.get_group(cls)["path"].values,size=2,replace=False)
             for path in paths :
-                im = self.reader(path)
-                img = Image.fromarray(im)
+                img = self.reader(path)
                 if self.transform_sequence :
                     img = self.transform_sequence(img)
-                im = (np.array(img)/np.max(im)*1.0).astype(np.float32)
+                im = (np.array(img)/np.max(img)*1.0).astype(np.float32)
                 inputs.append(im)
                 labels.append(cls)
         return {"inputs":inputs,"ground_truths":labels}
@@ -130,14 +124,13 @@ class ImageSegmentationDataset(Dataset) :
         return len(self.image_paths)
     def __getitem__(self,idx) :
         path = self.image_paths[idx]
-        im = self.image_reader(path)
+        img = self.image_reader(path)
         gt = []
         if self.image_mask :
             path = self.image_mask[idx]
             label = self.mask_reader(path)
             label = label.astype(np.int64)
             gt = [label]
-        img = im
         if self.transform_sequence :
             if self.image_mask :
                 max_l = np.max(gt[0])
@@ -150,11 +143,7 @@ class ImageSegmentationDataset(Dataset) :
                     gt = gt[1:]
             else :
                 img = self.transform_sequence(img)
-        im = img
-        if len(im.shape) == 3 :
-            m,n,c = im.shape
-            if c < m :
-                im = np.transpose(im,(2,0,1))
+        im = np.array(img)
         im = (im/np.max(im+1e-5)*1.0).astype(np.float32)
 
         return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
