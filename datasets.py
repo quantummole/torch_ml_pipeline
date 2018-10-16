@@ -12,10 +12,11 @@ from skimage import io
 from PIL import Image
 import torchvision.datasets as datasets
 import pydicom
-
 #mode = -1 is for test and debug
 #mode = 0 is for validation
 #mode = {1,2,3..} is for training
+
+from signals import Signal
 
 def im_reader(path) :
     if ".dcm" in path :
@@ -25,7 +26,6 @@ def im_reader(path) :
     im = im/(np.max(im)+1e-5)
     return im
 
-from signals import Signal
 class DatasetGenerator :
     def __init__(self,execution_modes,dataset_class,dataset_class_params,evaluator = None) :
         self.dataset_class = dataset_class
