@@ -89,11 +89,8 @@ class StratifiedShuffleFold(Fold) :
     def generate_folds(self,dataset) :
         self.dataset = dataset
     def get_fold(self,fold_num) :
-        orig_index_length = self.dataset.index[0]
-        orig_index_length = 1 if np.isscalar(orig_index_length) else len(orig_index_length)
-        dataset_groups = self.dataset.groupby(self.group_keys)
-        train_data = dataset_groups.apply(lambda x : x.sample(frac=self.training_split))
-        new_index_length = len(train_data.index[0])
-        ignore_length = new_index_length - orig_index_length
-        validation_data = self.dataset.drop([x[ignore_length:] for x in train_data.index.values.tolist()])
+        dataset_groups = self.dataset.groupby(self.group_keys,as_index=False,group_keys=False)
+        dataset_group_names = dataset_groups.groups.keys()
+        train_data = pd.concat([dataset_groups.get_group(key).sample(frac=self.training_split) for key in dataset_group_names])
+        validation_data = self.dataset.drop(train_data.index)
         return train_data,validation_data
