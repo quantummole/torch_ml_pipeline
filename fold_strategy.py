@@ -46,17 +46,10 @@ class DeterministicFold(Fold) :
     def __init__(self,training_split,evaluator = None) :
         super(DeterministicFold,self).__init__(training_split,evaluator)    
     def generate_folds(self,dataset) :
-        self.dataset = dataset
+        self.dataset = dataset.sample(frac=1).reset_index(drop=True)
         self.folds = []
-        curr_indices = []
-        curr_dataset = self.dataset
         for i in range(0,self.dataset.shape[0],self.validation_samples) :
-            pruned_dataset = curr_dataset.drop(curr_indices)
-            if pruned_dataset.shape[0] == 0 :
-                break
-            self.folds.append(pruned_dataset.sample(n=min([pruned_dataset.shape[0],self.validation_samples])))
-            curr_indices = self.folds[-1].index
-            curr_dataset = pruned_dataset
+            self.folds.append(self.dataset.iloc[i:i+self.validation_samples])
         self.num_folds = len(self.folds)
     def get_fold(self,fold_num) :
         validation_data = self.folds[fold_num]
@@ -68,28 +61,21 @@ class StratifiedDeterministicFold(Fold) :
         super(StratifiedDeterministicFold,self).__init__(training_split,evaluator)
         self.group_keys = group_keys
     def generate_folds(self,dataset) :
-        self.dataset = dataset
+        self.dataset = dataset.sample(frac=1).reset_index(drop=True)
         self.folds = []
-        curr_indices = []
-        curr_dataset = self.dataset
-        dataset_groups = curr_dataset.groupby(self.group_keys,as_index=False,group_keys=False)
+        dataset_groups = self.dataset.groupby(self.group_keys,as_index=False,group_keys=False)
         dataset_group_names = dataset_groups.groups.keys()
         dataset_group_lengths = [len(dataset_groups.get_group(key)) for key in dataset_group_names]
         sample_group_lengths = [np.int(np.ceil(x*self.validation_split)) for x in dataset_group_lengths]
-        for i in range(0,self.dataset.shape[0],self.validation_samples) :
-            pruned_dataset = curr_dataset.drop(curr_indices)
-            if pruned_dataset.shape[0] == 0 :
-                break
-            dataset_groups = pruned_dataset.groupby(self.group_keys,as_index=False,group_keys=False)
-            dataset_group_names = dataset_groups.groups.keys()
-            dataset_group_lengths = [len(dataset_groups.get_group(key)) for key in dataset_group_names]
+        fold_groups = []
+        for i,key in enumerate(dataset_group_names) :
             fold = []
-            for i,key in enumerate(dataset_group_names) :
-                fold.append(dataset_groups.get_group(key).sample(n=min([dataset_group_lengths[i],sample_group_lengths[i]])))
-            fold = pd.concat(fold)
-            self.folds.append(fold)
-            curr_indices = self.folds[-1].index
-            curr_dataset = pruned_dataset
+            for l in range(0,dataset_group_lengths[i],sample_group_lengths[i]) :
+                fold.append(dataset_groups.get_group(key).iloc[l:l+sample_group_lengths[i]])
+            fold_groups.append(fold)
+        n = np.min([len(x) for x in fold_groups])
+        for i in range(n) :
+            self.folds.append(pd.concat([fold_groups[j][i] for j in range(len(dataset_group_names))]))
         self.num_folds = len(self.folds)
     def get_fold(self,fold_num) :
         validation_data = self.folds[fold_num]
