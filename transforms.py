@@ -34,6 +34,10 @@ class PILTransform :
             x = np.array(x)
             return x
 
+def normalize(im) :
+    im = (im - im.mean())/(im.std()+1e-6)
+    return im
+
 def channel_first(im) :
     im = np.transpose(im,(2,0,1))
     return im
