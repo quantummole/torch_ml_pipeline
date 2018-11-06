@@ -67,7 +67,7 @@ class Trainer :
                     grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
                     inputs = [Variable(inp.data + 0.007*2*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
                 loader.set_postfix(loss=(loss_value/(i_batch+1)/(self.adversarial_steps+1)), mode=mode)
-        return loss_value/(i_batch+1)
+        return loss_value/(i_batch+1)/(self.adversarial_steps+1)
             
     def validate(self) :
         with torch.no_grad():
