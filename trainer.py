@@ -23,6 +23,7 @@ class Trainer :
                  max_epochs,
                  objective_fns,
                  val_max_score=1e+5,
+                 adversarial_steps = 1,
                  patience = None) :
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.network = network
@@ -43,6 +44,7 @@ class Trainer :
         self.scheduler = self.scheduler_class(self.optimizer,**self.scheduler_params)
         self.max_epochs = max_epochs
         self.val_max_score = val_max_score
+        self.adversarial_steps = adversarial_steps
         self.patience = patience if patience else int(0.2*self.max_epochs)
         self.patience_counter = 0
     def train(self,mode) :
@@ -55,14 +57,16 @@ class Trainer :
                 inputs = [Variable(inp.to(self.device), requires_grad=True) for inp in sample_batch['inputs']]
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                 debug_info = sample_batch['debug_info']
-                self.optimizer.zero_grad()
-                outputs = self.net(inputs=inputs,mode=mode)
-                loss = self.objective_fns[mode](outputs,ground_truths)
-                loss.backward()
-                grads.append(torch.abs(inputs[0].grad).mean().item())
-                self.optimizer.step()
-                loss_value += loss.detach().item()
-                loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode, mean_grad = np.mean(grads))
+                for j in range(self.adversarial_steps+1) :
+                    self.optimizer.zero_grad()
+                    outputs = self.net(inputs=inputs,mode=mode)
+                    loss = self.objective_fns[mode](outputs,ground_truths)
+                    loss.backward()
+                    self.optimizer.step()
+                    loss_value += loss.detach().item()
+                    grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
+                    inputs = [Variable(inp.data + 0.007*2*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
+                loader.set_postfix(loss=(loss_value/(i_batch+1)/(self.adversarial_steps+1)), mode=mode)
         return loss_value/(i_batch+1)
             
     def validate(self) :
