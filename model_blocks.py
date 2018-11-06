@@ -29,7 +29,7 @@ class SingleConvLayer(nn.Module) :
         output = self.layer(x)
         if self.training :
             if random.random() < self.noise_prob :
-                output = output + 0.5*torch.randn_like(output)
+                output = output + 0.001*torch.randn_like(output)
         return output
 
 class DoubleConvLayer(nn.Module) :
