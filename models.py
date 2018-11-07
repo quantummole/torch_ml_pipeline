@@ -27,8 +27,9 @@ class DensenetModels(nn.Module) :
         super(DensenetModels,self).__init__()
         self.model = model(pretrained=True)
         self.final_layer_features = self.model.classifier.in_features
-    def update_final_layer(self,final_layer) :
-        self.model.classifier = final_layer
+    def update_final_layer(self,num_classes) :
+        self.model.classifier =  nn.Sequential(nn.Dropout(),
+                              nn.Linear(self.final_layer_features,num_classes))
     def forward(self,inputs,mode) :
         outputs = []
         for inp in inputs :
@@ -44,8 +45,9 @@ class ResnetModels(nn.Module) :
         super(ResnetModels,self).__init__()
         self.model = model(pretrained=True)
         self.final_layer_features = self.model.fc.in_features
-    def update_final_layer(self,final_layer) :
-        self.model.fc = final_layer
+    def update_final_layer(self,num_classes) :
+        self.model.fc = nn.Sequential(nn.Dropout(),
+                              nn.Linear(self.final_layer_features,num_classes))
     def forward(self,inputs,mode) :
         outputs = []
         for inp in inputs :
@@ -60,11 +62,7 @@ class PreTrainedClassifier(nn.Module) :
         super(PreTrainedClassifier,self).__init__()
         self.model = model_class(model)
         self.num_classes = num_classes
-        layer = nn.Sequential(nn.Linear(self.model.final_layer_features,2*self.model.final_layer_features),
-                              nn.ReLU(),
-                              nn.Dropout(),
-                              nn.Linear(2*self.model.final_layer_features,self.num_classes))
-        self.model.update_final_layer(layer)
+        self.model.update_final_layer(self.num_classes)
     def forward(self,inputs,mode) :
         return self.model(inputs,mode)
 
