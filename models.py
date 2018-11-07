@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tfunc
 from torchvision import models
-from model_blocks import RecConvLayer, ResidualBlock, InceptionLayer, SingleConvLayer
+from model_blocks import DownSample, ResidualBlock, InceptionLayer, SingleConvLayer, SpatialAttention, ChannelAttention
 #mode = -1 is for debug
 #mode = 0 is for test and validation
 #mode = {1,2,3..} is for training
@@ -69,16 +69,24 @@ class PreTrainedClassifier(nn.Module) :
         return self.model(inputs,mode)
 
 class CustomNetClassification(nn.Module):
-    def __init__(self,input_dim, final_conv_dim, initial_channels,growth_factor,num_classes,conv_module) :
+    def __init__(self,num_classes,input_dim=256, final_conv_dim=8, initial_channels=3,initial_features=32,growth_factor=16) :
         super(CustomNetClassification,self).__init__()
+        self.start = nn.Sequential(SingleConvLayer(initial_channels,initial_features),
+                                   SpatialAttention(initial_features),
+                                   ChannelAttention(initial_features))
+        initial_channels = initial_features
         self.layer = nn.ModuleList()
         while input_dim >= final_conv_dim :
-            self.layer.append(nn.Sequential(conv_module(initial_channels,initial_channels+growth_factor),
-                                            nn.MaxPool2d(kernel_size=3,stride=2,padding=1)))
+            self.layer.append(nn.Sequential(ResidualBlock(initial_channels),
+                                            SpatialAttention(initial_channels),
+                                            ChannelAttention(initial_channels),
+                                            DownSample(initial_channels,initial_channels+growth_factor)))
             input_dim = input_dim//2
             initial_channels += growth_factor
-        num_units = input_dim*input_dim*initial_channels
-        self.output_layer = nn.Sequential(nn.Linear(num_units,num_classes))
+        self.output_layer = nn.Sequential(nn.Linear(initial_channels,initial_channels),
+                                          nn.Tanh(),
+                                          nn.Dropout(),
+                                          nn.Linear(initial_channels,num_classes))
         for m in self.modules():
                 if isinstance(m, nn.Conv2d):
                     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -93,9 +101,10 @@ class CustomNetClassification(nn.Module):
                 bs,m,n = inp.shape
                 inp = inp.view(bs,1,m,n)
             bs,c,m,n = inp.shape
+            inp = self.start(inp)
             for layer in self.layer :
                 inp = layer(inp)
-            inp = inp.view(bs,-1)    
+            inp = torch.mean(inp.view(bs,inp.shape[1],-1),dim=2)    
             output = self.output_layer(inp)
             outputs.append(output)
         return outputs

@@ -14,16 +14,19 @@ class SingleConvLayer(nn.Module) :
     def __init__(self,in_channels,out_channels,kernel_size = 3,dilation = 1, stride=1,padding= 0,activation = nn.PReLU, num_groups = None, noise_prob = 0.2) :
         super(SingleConvLayer,self).__init__()
         padding = dilation*(kernel_size - 1)//2
-        self.num_groups = num_groups if num_groups else 8 if out_channels % 8 ==0 else 4 if out_channels % 4 ==0 else 2 if out_channels % 2 ==0 else 1 
+        self.num_groups = num_groups if num_groups else (
+                8 if in_channels % 8 ==0 else (
+                        4 if in_channels % 4 ==0 else (
+                                2 if in_channels % 2 ==0 else 1)))
         self.eps = 1e-5
 
-        self.layer = nn.Sequential(nn.Conv2d(in_channels,out_channels,
+        self.layer = nn.Sequential(activation(),
+                nn.GroupNorm(self.num_groups,in_channels),
+                nn.utils.weight_norm(nn.Conv2d(in_channels,out_channels,
                                              kernel_size = kernel_size,
                                              padding = padding,
                                              stride = stride,
-                                             dilation = dilation),
-                                   activation(),
-                                   nn.GroupNorm(self.num_groups,out_channels))
+                                             dilation = dilation),name='weight'))
         self.noise_prob = noise_prob                
     def forward(self,x) :
         output = self.layer(x)
@@ -165,3 +168,42 @@ class RecConvLayer(nn.Module) :
         h_n = torch.transpose(h_n,1,3)
         v_n = torch.transpose(v_n,1,3)
         return self.final_comb(torch.cat([h_n,v_n],dim=1))
+
+class SpatialAttention(nn.Module) :
+    def __init__(self,num_channels,compression=0.5) :
+        super(SpatialAttention,self).__init__()
+        self.conv = DoubleConvLayer(num_channels,np.int(compression*num_channels))
+        self.attention = nn.Sequential(SingleConvLayer(np.int(num_channels*compression),1,kernel_size=1),nn.Sigmoid())
+    def forward(self,inputs) :
+        attention_mask = self.attention(self.conv(inputs))
+        return inputs*attention_mask
+
+
+class ChannelAttention(nn.Module) :
+    def __init__(self,num_channels,compression=0.5,hidden_layers = 2) :
+        super(ChannelAttention,self).__init__()
+        self.conv = nn.Sequential(nn.Linear(num_channels,np.int(compression*num_channels)),
+                                  nn.Tanh()
+                                  )
+        for i in range(hidden_layers-1) :
+            self.conv.add_module("linear_layer%d" %(i+1),nn.Linear(np.int(compression*num_channels),np.int(compression*num_channels)))
+            self.conv.add_module("tanh_layer%d" %(i+1),nn.Tanh())
+        self.attention = nn.Sequential(nn.Linear(np.int(num_channels*compression),num_channels),nn.Sigmoid())
+    def forward(self,inputs) :
+        flattened = inputs.view(inputs.shape[0],inputs.shape[1],-1)
+        flattened = torch.mean(flattened,dim=2)
+        ndim = len(inputs.shape)
+        shape = [inputs.shape[0],inputs.shape[1]]+[1]*(ndim-2)
+        attention_mask = self.attention(self.conv(flattened)).view(*shape)
+        return inputs*attention_mask
+
+class DownSample(nn.Module) :
+    def __init__(self,num_channels,out_channels) :
+        super(DownSample,self).__init__()
+        self.conv = SingleConvLayer(num_channels,num_channels,stride=2,padding=1)
+        self.max_pool = nn.MaxPool2d(kernel_size=3,stride=2,padding=1)
+        self.out = SingleConvLayer(2*num_channels,out_channels)
+    def forward(self,inputs) :
+        out1 = self.conv(inputs)
+        out2 = self.max_pool(inputs)
+        return self.out(torch.cat([out1,out2],dim=1))

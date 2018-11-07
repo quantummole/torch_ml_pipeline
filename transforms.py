@@ -34,6 +34,10 @@ class PILTransform :
             x = np.array(x)
             return x
 
+def random_gamma(im) :
+    y = 0.2*(np.random.rand(1).item()-0.5) + 1
+    im = im/np.max(im)
+    return im**y
 def normalize(im) :
     im = (im - im.mean())/(im.std()+1e-6)
     return im
