@@ -24,6 +24,7 @@ class Trainer :
                  objective_fns,
                  val_max_score=1e+5,
                  adversarial_steps = 1,
+                 inference_iters = None,
                  patience = None) :
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.network = network
@@ -47,6 +48,7 @@ class Trainer :
         self.adversarial_steps = adversarial_steps
         self.patience = patience if patience else int(0.2*self.max_epochs)
         self.patience_counter = 0
+        self.inference_iters = inference_iters
     def train(self,mode) :
         self.net.train()
         self.objective_fns[mode].train()
@@ -131,7 +133,9 @@ class Trainer :
                     if self.patience_counter == self.patience :
                         break
                 epoch_iters.set_postfix(best_epoch = best_epoch,best_validation_loss =  self.val_max_score , training_loss = train_loss, config_id = self.Evaluator.config_id)
-        self.infer()
+        self.inference_iters = self.inference_iters if self.inference_iters else 0.1*best_epoch
+        for i in range(self.inference_iters) :
+            self.infer()
         del self.net
         torch.cuda.empty_cache()
         return Signal.COMPLETE,[epoch_scores]
