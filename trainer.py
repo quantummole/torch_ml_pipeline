@@ -59,17 +59,17 @@ class Trainer :
                 inputs = [Variable(inp.to(self.device), requires_grad=True) for inp in sample_batch['inputs']]
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                 debug_info = sample_batch['debug_info']
+                self.optimizer.zero_grad()
                 for j in range(self.adversarial_steps+1) :
-                    self.optimizer.zero_grad()
                     outputs = self.net(inputs=inputs,mode=mode)
-                    loss = self.objective_fns[mode](outputs,ground_truths)
+                    loss = self.objective_fns[mode](outputs,ground_truths)/(self.adversarial_steps+1)
                     loss.backward()
-                    self.optimizer.step()
                     loss_value += loss.detach().item()
                     grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
-                    inputs = [Variable(inp.data + 0.007*2*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
-                loader.set_postfix(loss=(loss_value/(i_batch+1)/(self.adversarial_steps+1)), mode=mode)
-        return loss_value/(i_batch+1)/(self.adversarial_steps+1)
+                    inputs = [Variable(inp.data + 0.007*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
+                self.optimizer.step()
+                loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode)
+        return loss_value/(i_batch+1)
             
     def validate(self) :
         with torch.no_grad():
