@@ -24,6 +24,7 @@ class Trainer :
                  objective_fns,
                  val_max_score=1e+5,
                  adversarial_steps = 1,
+                 num_batches_per_step = 1,
                  inference_iters = None,
                  patience = None) :
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -46,6 +47,7 @@ class Trainer :
         self.max_epochs = max_epochs
         self.val_max_score = val_max_score
         self.adversarial_steps = adversarial_steps
+        self.num_batches_per_step = num_batches_per_step
         self.patience = patience if patience else int(0.2*self.max_epochs)
         self.patience_counter = 0
         self.inference_iters = inference_iters
@@ -54,21 +56,28 @@ class Trainer :
         self.objective_fns[mode].train()
         loss_value = 0
         grads = []
+        self.optimizer.zero_grad()
+        step_counter = 0
         with tqdm(self.dataloaders[mode],desc = "Training Epoch") as loader :
             for i_batch,sample_batch in enumerate(loader) :
                 inputs = [Variable(inp.to(self.device), requires_grad=True) for inp in sample_batch['inputs']]
                 ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
                 debug_info = sample_batch['debug_info']
-                self.optimizer.zero_grad()
                 for j in range(self.adversarial_steps+1) :
                     outputs = self.net(inputs=inputs,mode=mode)
-                    loss = self.objective_fns[mode](outputs,ground_truths)/(self.adversarial_steps+1)
+                    loss = self.objective_fns[mode](outputs,ground_truths)/(self.adversarial_steps+1)/self.num_batches_per_step
                     loss.backward()
                     loss_value += loss.detach().item()
                     grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
                     inputs = [Variable(inp.data + 0.007*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
-                self.optimizer.step()
+                step_counter += 1
+                if step_counter == self.num_batches_per_step :
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+                    step_counter = 0
                 loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode)
+        if step_counter > 0 :
+            self.optimizer.step()
         return loss_value/(i_batch+1)
             
     def validate(self) :
