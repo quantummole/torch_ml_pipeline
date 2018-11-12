@@ -83,7 +83,7 @@ class Trainer :
     def validate(self) :
         with torch.no_grad():
             self.net.eval()
-            self.objective_fns[0].train()
+            self.objective_fns[0].eval()
             score = 0
             with tqdm(self.dataloaders[0],desc="Evaluation Epoch") as loader :
                 for i_batch,sample_batch in enumerate(loader) :
