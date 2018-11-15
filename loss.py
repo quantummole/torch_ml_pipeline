@@ -49,11 +49,24 @@ class Accuracy(nn.Module) :
         return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))
 
 class MultiLabelBCE(nn.Module) :
-    def __init__(self) :
+    def __init__(self,temperature = 1) :
         super(MultiLabelBCE,self).__init__()
         self.loss_fn = nn.BCEWithLogitsLoss()
+        self.temperature = temperature
     def forward(self,logits,target) :
-        loss = self.loss_fn(logits,target)
+        loss = self.loss_fn(logits/self.temperature,target)
+        return loss
+
+class MaxEntropyLoss(nn.Module) :
+    def __init__(self) :
+        super(MaxEntropyLoss,self).__init__()
+    def forward(self,logits,target = None) :
+        logits = logits.view(logits.shape[0],logits.shape[1],-1)
+        predictions = tfunc.softmax(logits,dim=1)
+        log_predictions = tfunc.log_softmax(logits,dim=1)
+        self_entropy = predictions*log_predictions
+        entropy = torch.sum(self_entropy,dim=1)
+        loss = entropy.mean()
         return loss
 
 class MarginLoss(nn.Module) :
@@ -70,13 +83,14 @@ class MarginLoss(nn.Module) :
         return torch.mean(torch.log(1 + predictions))
 
 class FocalCELoss(nn.Module) :
-    def __init__(self,low=0.01,high=1.2,gamma = 2) :
+    def __init__(self,low=0.01,high=1.2,gamma = 0, temperature = 1) :
         super(FocalCELoss,self).__init__()
         self.low = low
         self.high = high
         self.gamma = gamma
+        self.temperature = temperature
     def forward(self,logits,target) :
-        logits = logits.view(logits.shape[0],logits.shape[1],-1)
+        logits = logits.view(logits.shape[0],logits.shape[1],-1)/self.temperature
         outputs_onehot = torch.zeros_like(logits)
         target = target.view(logits.shape[0],1,-1)
         outputs_onehot = outputs_onehot.scatter(1,target,1.0) 
@@ -86,13 +100,15 @@ class FocalCELoss(nn.Module) :
         return torch.mean(loss)
 
 class SoftDice(nn.Module) :
-    def __init__(self,smooth=1,low=0.01,high=1.2,gamma = 2) :
+    def __init__(self,smooth=1,low=0.01,high=1.2,gamma = 2, temperature = 1) :
         super(SoftDice,self).__init__()
         self.smooth = smooth
         self.low = low
         self.high = high
         self.gamma = gamma
+        self.temperature = temperature
     def forward(self,logits,target) :
+        logits = logits/self.temperature
         predictions = tfunc.softmax(logits,dim=1)
         target = target.view(logits.shape[0],1,-1)
         predictions = predictions.view(logits.shape[0],logits.shape[1],-1)
