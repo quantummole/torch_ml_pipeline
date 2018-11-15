@@ -49,7 +49,7 @@ class Accuracy(nn.Module) :
         return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))
 
 class MultiLabelBCE(nn.Module) :
-    def __init__(self,temperature = 1) :
+    def __init__(self,temperature = 1.) :
         super(MultiLabelBCE,self).__init__()
         self.loss_fn = nn.BCEWithLogitsLoss()
         self.temperature = temperature
@@ -83,7 +83,7 @@ class MarginLoss(nn.Module) :
         return torch.mean(torch.log(1 + predictions))
 
 class FocalCELoss(nn.Module) :
-    def __init__(self,low=0.01,high=1.2,gamma = 0, temperature = 1) :
+    def __init__(self,low=0.01,high=1.2,gamma = 0, temperature = 1.) :
         super(FocalCELoss,self).__init__()
         self.low = low
         self.high = high
@@ -91,16 +91,14 @@ class FocalCELoss(nn.Module) :
         self.temperature = temperature
     def forward(self,logits,target) :
         logits = logits.view(logits.shape[0],logits.shape[1],-1)/self.temperature
-        outputs_onehot = torch.zeros_like(logits)
-        target = target.view(logits.shape[0],1,-1)
-        outputs_onehot = outputs_onehot.scatter(1,target,1.0) 
+        target = target.view(logits.shape[0],-1)
         predictions = tfunc.softmax(logits,dim=1)
         factor = torch.clamp((1- predictions)/(predictions+ 1e-5),self.low,self.high).pow(self.gamma)
-        loss = (-tfunc.log_softmax(logits,dim=1)*factor*outputs_onehot).sum(dim=1)
-        return torch.mean(loss)
-
+        loss = tfunc.nll_loss(tfunc.log_softmax(logits,dim=1)*factor,target)
+        return loss
+    
 class SoftDice(nn.Module) :
-    def __init__(self,smooth=1,low=0.01,high=1.2,gamma = 2, temperature = 1) :
+    def __init__(self,smooth=1.,low=0.01,high=1.2,gamma = 2., temperature = 1.) :
         super(SoftDice,self).__init__()
         self.smooth = smooth
         self.low = low
@@ -121,7 +119,7 @@ class SoftDice(nn.Module) :
         return torch.mean(loss)
 
 class DiceAccuracy(nn.Module) :
-    def __init__(self,smooth=1) :
+    def __init__(self,smooth=1.) :
         super(DiceAccuracy,self).__init__()
         self.smooth = smooth
     def forward(self,logits,target) :
