@@ -38,6 +38,8 @@ class Trainer :
         self.loader_options = loader_options
         self.Evaluator = evaluator
         self.objective_fns = objective_fns
+        for key in self.objective_fns.keys() :
+            self.objective_fns[key] = self.objective_fns[key].to(self.device)
         self.model_file = self.Evaluator.get_model_file()
         self.net = self.network(**self.network_params).to(self.device)
         objective_fn_params = [list(fn.parameters()) for key,fn in self.objective_fns.items()]
