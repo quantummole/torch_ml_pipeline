@@ -57,29 +57,50 @@ class Trainer :
         self.net.train()
         self.objective_fns[mode].train()
         loss_value = 0
-        grads = []
+        def train_closure(inputs,ground_truths) :
+            loss_val = 0.0
+            inputs = [Variable(inp.to(self.device), requires_grad=True) for inp in inputs]
+            ground_truths = [gt.to(self.device) for gt in ground_truths]
+            for j in range(self.adversarial_steps+1) :
+                outputs = self.net(inputs=inputs,mode=mode)
+                loss = self.objective_fns[mode](outputs,ground_truths)/(self.adversarial_steps+1)/self.num_batches_per_step
+                loss.backward()
+                loss_val += loss.detach().item()
+                grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
+                inputs = [Variable(inp.data + 0.007*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
+            return loss_val
+        def step_closure(input_batches,gt_batches) :
+            [train_closure(inp,gt) for inp,gt in zip(input_batches,gt_batches)]
+        input_batches = []
+        gt_batches = []
         self.optimizer.zero_grad()
         step_counter = 0
         with tqdm(self.dataloaders[mode],desc = "Training Epoch") as loader :
             for i_batch,sample_batch in enumerate(loader) :
-                inputs = [Variable(inp.to(self.device), requires_grad=True) for inp in sample_batch['inputs']]
-                ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
-                debug_info = sample_batch['debug_info']
-                for j in range(self.adversarial_steps+1) :
-                    outputs = self.net(inputs=inputs,mode=mode)
-                    loss = self.objective_fns[mode](outputs,ground_truths)/(self.adversarial_steps+1)/self.num_batches_per_step
-                    loss.backward()
-                    loss_value += loss.detach().item()
-                    grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
-                    inputs = [Variable(inp.data + 0.007*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
+                input_batches.append(sample_batch['ground_truths'])
+                gt_batches.append(sample_batch['ground_truths'])
                 step_counter += 1
                 if step_counter == self.num_batches_per_step :
-                    self.optimizer.step()
+                    closure = lambda : step_closure(input_batches,gt_batches)
+                    self.optimizer.step(closure)
+                    loss_value += np.sum([train_closure(inp,gt) for inp,gt in zip(input_batches,gt_batches)])
+                    input_batches = []
+                    gt_batches = []
                     self.optimizer.zero_grad()
                     step_counter = 0
                 loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode)
         if step_counter > 0 :
-            self.optimizer.step()
+            closure = lambda : step_closure(input_batches,gt_batches)
+            self.optimizer.step(closure)
+            loss_value += np.sum([train_closure(inp,gt) for inp,gt in zip(input_batches,gt_batches)])
+            input_batches = []
+            gt_batches = []
+            self.optimizer.step(closure)
+            loss_value += np.sum([train_closure(inp,gt) for inp,gt in zip(input_batches,gt_batches)])
+            input_batches = []
+            gt_batches = []
+            self.optimizer.zero_grad()
+            step_counter = 0            
         return loss_value/(i_batch+1)
             
     def validate(self) :
@@ -91,7 +112,6 @@ class Trainer :
                 for i_batch,sample_batch in enumerate(loader) :
                     inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
-                    debug_info = sample_batch['debug_info']
                     outputs = self.net(inputs=inputs,mode=0)
                     score += self.objective_fns[0](outputs,ground_truths).item()
                     loader.set_postfix(score=(score/(i_batch+1)))

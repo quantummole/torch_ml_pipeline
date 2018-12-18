@@ -112,10 +112,10 @@ class SoftDice(nn.Module) :
         predictions = predictions.view(logits.shape[0],logits.shape[1],-1)
         outputs_onehot = torch.zeros_like(predictions)
         outputs_onehot = outputs_onehot.scatter(1,target,1.0)
-        factor = torch.clamp((1- predictions)/(predictions+ 1e-5),self.low,self.high).pow(self.gamma)
-        intersection = (factor*predictions*outputs_onehot).sum(dim=2)
-        union = (factor*(predictions + outputs_onehot)).sum(dim=2) - intersection
-        loss = 1 - (intersection+self.smooth)/(union+self.smooth)
+        weights = 1.0/outputs_onehot.sum(axis=2)
+        intersection = (predictions*outputs_onehot).sum(dim=2)*weights
+        union = (predictions + outputs_onehot).sum(dim=2)*weights - intersection
+        loss = -torch.log((intersection+self.smooth).sum(axis=1)/(union+self.smooth).sum(axis=1))
         return torch.mean(loss)
 
 class DiceAccuracy(nn.Module) :
