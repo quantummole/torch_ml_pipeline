@@ -7,7 +7,7 @@ Created on Tue Oct 16 19:41:52 2018
 import random
 import numpy as np
 from PIL import Image
-from skimage import img_as_ubyte
+from skimage import img_as_ubyte, exposure
 class BoolTransform :
     def __init__(self,transform,prob = 0.5) :
         self.transform = transform
@@ -38,6 +38,10 @@ def random_gamma(im) :
     y = 0.2*(np.random.rand(1).item()-0.5) + 1
     im = im/np.max(im)
     return im**y
+
+def equalize_hist(im) :
+    return exposure.equalize_hist(im)
+
 def normalize(im) :
     im = (im - im.mean())/(im.std()+1e-6)
     return im
