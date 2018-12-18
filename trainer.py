@@ -77,7 +77,7 @@ class Trainer :
         step_counter = 0
         with tqdm(self.dataloaders[mode],desc = "Training Epoch") as loader :
             for i_batch,sample_batch in enumerate(loader) :
-                input_batches.append(sample_batch['ground_truths'])
+                input_batches.append(sample_batch['inputs'])
                 gt_batches.append(sample_batch['ground_truths'])
                 step_counter += 1
                 if step_counter == self.num_batches_per_step :
@@ -101,7 +101,7 @@ class Trainer :
             gt_batches = []
             self.optimizer.zero_grad()
             step_counter = 0            
-        return loss_value/(i_batch+1)
+        return loss_value/(i_batch+1)*self.num_batches_per_step
             
     def validate(self) :
         with torch.no_grad():
