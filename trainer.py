@@ -91,13 +91,11 @@ class Trainer :
                     gt_batches = []
                     self.optimizer.zero_grad()
                     step_counter = 0
-                loader.set_postfix(loss=(loss_value/(i_batch+1)), mode=mode)
+                    loader.set_postfix(loss=(loss_value/(i_batch+1))*self.num_batches_per_step, mode=mode)
         if step_counter > 0 :
             closure = lambda : step_closure(input_batches,gt_batches)
             self.optimizer.step(closure)
             loss_value += np.sum([train_closure(inp,gt) for inp,gt in zip(input_batches,gt_batches)])
-            input_batches = []
-            gt_batches = []
             self.optimizer.step(closure)
             loss_value += closure().detach().item()
             input_batches = []
