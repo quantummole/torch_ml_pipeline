@@ -83,26 +83,22 @@ class MarginLoss(nn.Module) :
         return torch.mean(torch.log(1 + predictions))
 
 class FocalCELoss(nn.Module) :
-    def __init__(self,low=0.01,high=1.2,gamma = 0, temperature = 1.) :
+    def __init__(self,gamma = 0, temperature = 1.) :
         super(FocalCELoss,self).__init__()
-        self.low = low
-        self.high = high
         self.gamma = gamma
         self.temperature = temperature
     def forward(self,logits,target) :
         logits = logits.view(logits.shape[0],logits.shape[1],-1)/self.temperature
         target = target.view(logits.shape[0],-1)
         predictions = tfunc.softmax(logits,dim=1)
-        factor = torch.clamp((1- predictions)/(predictions+ 1e-5),self.low,self.high).pow(self.gamma)
+        factor = (1- predictions).pow(self.gamma)
         loss = tfunc.nll_loss(tfunc.log_softmax(logits,dim=1)*factor,target)
         return loss
     
 class SoftDice(nn.Module) :
-    def __init__(self,smooth=1.,low=0.01,high=1.2,gamma = 2., temperature = 1.) :
+    def __init__(self,smooth=1.,gamma = 0., temperature = 1.) :
         super(SoftDice,self).__init__()
         self.smooth = smooth
-        self.low = low
-        self.high = high
         self.gamma = gamma
         self.temperature = temperature
     def forward(self,logits,target) :
@@ -110,12 +106,12 @@ class SoftDice(nn.Module) :
         predictions = tfunc.softmax(logits,dim=1)
         target = target.view(logits.shape[0],1,-1)
         predictions = predictions.view(logits.shape[0],logits.shape[1],-1)
+        factor = (1- predictions).pow(self.gamma)
         outputs_onehot = torch.zeros_like(predictions)
         outputs_onehot = outputs_onehot.scatter(1,target,1.0)
-        weights = 1.0/outputs_onehot.sum(axis=2)
-        intersection = (predictions*outputs_onehot).sum(dim=2)*weights
-        union = (predictions + outputs_onehot).sum(dim=2)*weights - intersection
-        loss = -torch.log((intersection+self.smooth).sum(axis=1)/(union+self.smooth).sum(axis=1))
+        intersection = (factor*predictions*outputs_onehot).sum(dim=2)
+        union = (factor*(predictions + outputs_onehot)).sum(dim=2) - intersection
+        loss = -torch.log(((intersection+self.smooth)/(union+self.smooth)).mean(dim=1))
         return torch.mean(loss)
 
 class DiceAccuracy(nn.Module) :
