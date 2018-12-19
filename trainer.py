@@ -70,13 +70,13 @@ class Trainer :
                 inputs = [Variable(inp.data + 0.007*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
             return loss_val
         def step_closure(input_batches,gt_batches) :
+            self.optimizer.zero_grad()
             loss_val = 0.0 
             for inp,gt in zip(input_batches,gt_batches) :
                 loss_val += train_closure(inp,gt)
             return  loss_val
         input_batches = []
         gt_batches = []
-        self.optimizer.zero_grad()
         step_counter = 0
         with tqdm(self.dataloaders[mode],desc = "Training Epoch") as loader :
             for i_batch,sample_batch in enumerate(loader) :
@@ -85,22 +85,16 @@ class Trainer :
                 step_counter += 1
                 if step_counter == self.num_batches_per_step :
                     closure = lambda : step_closure(input_batches,gt_batches)
-                    self.optimizer.step(closure)
-                    loss_value += closure().detach().item()
+                    loss_value += self.optimizer.step(closure).detach().item()
                     input_batches = []
                     gt_batches = []
-                    self.optimizer.zero_grad()
                     step_counter = 0
                     loader.set_postfix(loss=(loss_value/(i_batch+1))*self.num_batches_per_step, mode=mode)
         if step_counter > 0 :
             closure = lambda : step_closure(input_batches,gt_batches)
-            self.optimizer.step(closure)
-            loss_value += np.sum([train_closure(inp,gt) for inp,gt in zip(input_batches,gt_batches)])
-            self.optimizer.step(closure)
-            loss_value += closure().detach().item()
+            loss_value += self.optimizer.step(closure).detach().item()
             input_batches = []
             gt_batches = []
-            self.optimizer.zero_grad()
             step_counter = 0            
         return loss_value/(i_batch+1)*self.num_batches_per_step
             
