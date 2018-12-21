@@ -14,6 +14,23 @@ from tqdm import tqdm, trange
 from signals import Signal
 from functools import reduce
 
+
+class SupervisedTrainClosure :
+    def __init__(self) :
+        pass
+    def __call__(self,engine_self,inputs,ground_truths,mode) :
+        loss_val = 0.0
+        inputs = [Variable(inp.to(engine_self.device), requires_grad=True) for inp in inputs]
+        ground_truths = [gt.to(engine_self.device) for gt in ground_truths]
+        for j in range(engine_self.adversarial_steps+1) :
+            outputs = engine_self.net(inputs=inputs,mode=mode)
+            loss = engine_self.objective_fns[mode](outputs,ground_truths)/(engine_self.adversarial_steps+1)/self.num_batches_per_step
+            loss.backward()
+            loss_val += loss
+            grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
+            inputs = [Variable(inp.data + 0.007*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
+        return loss_val
+
 class Trainer :
     def __init__(self,network,network_params,
                  optimizer,optimizer_params,
@@ -26,7 +43,8 @@ class Trainer :
                  adversarial_steps = 1,
                  num_batches_per_step = 1,
                  inference_iters = None,
-                 patience = None) :
+                 patience = None,
+                 train_closure = SupervisedTrainClosure) :
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.network = network
         self.network_params = network_params
@@ -53,27 +71,16 @@ class Trainer :
         self.patience = patience if patience else int(0.2*self.max_epochs)
         self.patience_counter = 0
         self.inference_iters = inference_iters
+        self.train_closure = train_closure()
     def train(self,mode) :
         self.net.train()
         self.objective_fns[mode].train()
         loss_value = 0
-        def train_closure(inputs,ground_truths) :
-            loss_val = 0.0
-            inputs = [Variable(inp.to(self.device), requires_grad=True) for inp in inputs]
-            ground_truths = [gt.to(self.device) for gt in ground_truths]
-            for j in range(self.adversarial_steps+1) :
-                outputs = self.net(inputs=inputs,mode=mode)
-                loss = self.objective_fns[mode](outputs,ground_truths)/(self.adversarial_steps+1)/self.num_batches_per_step
-                loss.backward()
-                loss_val += loss
-                grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
-                inputs = [Variable(inp.data + 0.007*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
-            return loss_val
         def step_closure(input_batches,gt_batches) :
             self.optimizer.zero_grad()
             loss_val = 0.0 
             for inp,gt in zip(input_batches,gt_batches) :
-                loss_val += train_closure(inp,gt)
+                loss_val += self.train_closure(self,inp,gt,mode)
             return  loss_val
         input_batches = []
         gt_batches = []
@@ -165,58 +172,3 @@ class Trainer :
         del self.net
         torch.cuda.empty_cache()
         return Signal.COMPLETE,[epoch_scores]
-        
-    
-class Debugger :
-    def __init__(self,network,device,ensemble_configs,weights,inference_dir,inference_fn,debug_dir,debug_fn) :
-        self.ensemble = [network(**config) for config in ensemble_configs]
-        self.weights = weights
-        self.inference_fn = inference_fn
-        self.debug_fn = debug_fn
-        self.device = device
-        self.debug_dir = debug_dir
-        self.inference_dir = inference_dir
-        
-        
-    def infer(self,dataloader,data_id) :
-        def collate(outputs) :
-            num_outputs = len(outputs[0])
-            final_outputs = []
-            for i in range(num_outputs) :
-                output = 0
-                for out in outputs :
-                    output = output + out[i]
-                final_outputs.append(output)
-            return final_outputs
-
-        with torch.no_grad():
-            with tqdm(dataloader,desc="Batches",leave=False) as loader :
-                for i_batch,sample_batch in enumerate(loader) :
-                    inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
-                    ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
-                    debug_info = sample_batch['debug_info']
-                    outputs = []
-                    for i_net,net in enumerate(tqdm(self.ensemble,desc="Ensemble",leave=False)) :
-                        net = net.to(self.device)
-                        net.eval()
-                        net_outputs = net(inputs,mode=-1)
-                        net_outputs = [self.weights[i_net]*output for output in net_outputs]
-                        outputs.append(net_outputs)
-                        net = net.cpu()
-                        torch.cuda.empty_cache()
-                    outputs = collate(outputs)
-                    self.inference_fn(self.inference_dir,data_id,debug_info,outputs,ground_truths)
-
-    def debug(self,dataloader,data_id,model_id) :
-        with torch.no_grad():
-            with tqdm(dataloader,desc="Batches",leave=False) as loader :
-                for i_batch,sample_batch in enumerate(loader) :
-                    inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
-                    ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
-                    debug_info = sample_batch['debug_info']
-                    net = self.ensemble[model_id].to(self.device)
-                    net.eval()
-                    net_outputs = net(inputs,mode=-2)
-                    net = net.cpu()
-                    torch.cuda.empty_cache()
-                    self.debug_fn(self.debug_dir,data_id,debug_info,net_outputs,ground_truths)
