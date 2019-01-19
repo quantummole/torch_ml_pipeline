@@ -58,7 +58,7 @@ class ImageClassificationDataset(Dataset) :
         self.image_id = data.id.values.tolist()
         self.image_paths = data.path.values.tolist()
         if label_columns :
-            self.image_class = data[label_columns].values.tolist()
+            self.image_class = data.ix[:,label_columns].values.tolist()
         else :
             self.image_class = None
         self.reader = reader
