@@ -91,10 +91,31 @@ class FocalCELoss(nn.Module) :
         logits = logits.view(logits.shape[0],logits.shape[1],-1)/self.temperature
         target = target.view(logits.shape[0],-1)
         predictions = tfunc.softmax(logits,dim=1)
+        outputs_onehot = torch.zeros_like(logits)
+        outputs_onehot = outputs_onehot.scatter(1,target.view(logits.shape[0],1,-1),1.0)
+        weights = logits.shape[0]/(outputs_onehot.sum(dim=0,keepdim=True)+1.)
         factor = (1- predictions).pow(self.gamma)
-        loss = tfunc.nll_loss(tfunc.log_softmax(logits,dim=1)*factor,target)
+        loss = tfunc.nll_loss(tfunc.log_softmax(logits,dim=1)*factor*weights,target)
         return loss
-    
+
+class MultiLabelSoftmaxLoss(nn.Module) :
+    def __init__(self,temperature=1.) :
+        super(MultiLabelSoftmaxLoss,self).__init__()
+        self.temperature = temperature
+    def forward(self,logits,target) :
+        logits = logits.view(logits.shape[0],logits.shape[1],-1)/self.temperature
+        logits_max,_ = torch.max(logits,dim=2,keepdim=True)
+        target = target.view(logits.shape[0],-1)
+        outputs_onehot = torch.zeros_like(logits)
+        outputs_onehot = outputs_onehot.scatter(1,target.view(logits.shape[0],1,-1),1.0)
+        logits = torch.exp(logits-logits_max)
+        numerator = logits*outputs_onehot
+        denominator = numerator + ((1-outputs_onehot)*logits).sum(dim=2,keepdim=True)
+        log_predictions = torch.log(torch.clamp(numerator/denominator,1e-7,1-1e-7))
+        log_likelihood = (log_predictions*outputs_onehot).sum(dim=2)/target.sum(dim=2)
+        loss = -1*log_likelihood.mean()
+        return loss
+        
 class SoftDice(nn.Module) :
     def __init__(self,smooth=1.,gamma = 0., temperature = 1.) :
         super(SoftDice,self).__init__()
