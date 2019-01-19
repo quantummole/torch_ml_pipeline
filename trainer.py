@@ -14,6 +14,14 @@ from tqdm import tqdm, trange
 from signals import Signal
 from functools import reduce
 
+class create_net :
+    def __init__(self,net) :
+        self.net = net
+    def __call__(self,network_params,weights = None) :
+        network = nn.DataParallel(self.net(**network_params))
+        if weights :
+            network.load_state_dict(torch.load(weights,map_location=lambda storage, loc: storage))
+        return network
 
 class SupervisedTrainClosure :
     def __init__(self) :
@@ -24,7 +32,7 @@ class SupervisedTrainClosure :
         ground_truths = [gt.to(engine_self.device) for gt in ground_truths]
         for j in range(engine_self.adversarial_steps+1) :
             outputs = engine_self.net(inputs=inputs,mode=mode)
-            loss = engine_self.objective_fns[mode](outputs,ground_truths)/(engine_self.adversarial_steps+1)/self.num_batches_per_step
+            loss = engine_self.objective_fns[mode](outputs,ground_truths)/(engine_self.adversarial_steps+1)/engine_self.num_batches_per_step
             loss.backward()
             loss_val += loss
             grads = [torch.ge(inp.grad,0.0).type_as(inp) for inp in inputs]
