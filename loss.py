@@ -93,7 +93,8 @@ class FocalCELoss(nn.Module) :
         predictions = tfunc.softmax(logits,dim=1)
         outputs_onehot = torch.zeros_like(logits)
         outputs_onehot = outputs_onehot.scatter(1,target.view(logits.shape[0],1,-1),1.0)
-        weights = logits.shape[0]/(outputs_onehot.sum(dim=0,keepdim=True)+1.)
+        class_counts = outputs_onehot.sum(dim=0,keepdim=True)
+        weights = logits.shape[0]/torch.where(class_counts>0,class_counts,class_counts+1)
         factor = (1- predictions).pow(self.gamma)
         loss = tfunc.nll_loss(tfunc.log_softmax(logits,dim=1)*factor*weights,target)
         return loss
@@ -112,7 +113,8 @@ class MultiLabelSoftmaxLoss(nn.Module) :
         numerator = logits*outputs_onehot
         denominator = numerator + ((1-outputs_onehot)*logits).sum(dim=2,keepdim=True)
         log_predictions = torch.log(torch.clamp(numerator/denominator,1e-7,1-1e-7))
-        log_likelihood = (log_predictions*outputs_onehot).sum(dim=2)/target.sum(dim=2)
+        class_counts = outputs_onehot.sum(dim=2)
+        log_likelihood = (log_predictions*outputs_onehot).sum(dim=2)/torch.where(class_counts>0,class_counts,class_counts+1)
         loss = -1*log_likelihood.mean()
         return loss
         
