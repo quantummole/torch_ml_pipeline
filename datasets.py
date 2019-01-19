@@ -51,14 +51,14 @@ class DatasetGenerator :
         return Signal.COMPLETE,[datasets]
 
 class ImageClassificationDataset(Dataset) :
-    def __init__(self,data,mode = -1,reader = im_reader,transform_sequence = None) :
+    def __init__(self,data,mode = -1,reader = im_reader,label_columns = None,transform_sequence = None) :
         super(ImageClassificationDataset,self).__init__()
         self.mode = mode
         self.transform_sequence = transform_sequence
         self.image_id = data.id.values.tolist()
         self.image_paths = data.path.values.tolist()
-        if "label" in data.columns:
-            self.image_class = data.label.values.tolist()
+        if label_columns :
+            self.image_class = data[label_columns].values.tolist()
         else :
             self.image_class = None
         self.reader = reader
