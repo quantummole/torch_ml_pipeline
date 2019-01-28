@@ -73,7 +73,7 @@ class ImageClassificationDataset(Dataset) :
         im = (im/np.max(im)*1.0).astype(np.float32)
         gt = []
         if self.image_class :
-            label = np.long(self.image_class[idx])
+            label = self.image_class[idx].astype(np.long)
             gt = [label]
         return {"inputs":[im],"ground_truths":gt,"debug_info":[self.image_id[idx]]}
 

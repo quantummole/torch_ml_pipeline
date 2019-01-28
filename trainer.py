@@ -13,6 +13,7 @@ import numpy as np
 from tqdm import tqdm, trange
 from signals import Signal
 from functools import reduce
+import torch.nn as nn
 
 class create_net :
     def __init__(self,net) :
