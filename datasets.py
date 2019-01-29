@@ -31,9 +31,8 @@ class DatasetGenerator :
         self.dataset_class = dataset_class
         self.dataset_class_params = dataset_class_params
         self.modes = execution_modes
-    def execute(self,datasets=None,train_dataset=None,val_dataset=None,dataset_list=[]) :
-        if datasets == None :
-            datasets = {}
+    def execute(self,train_dataset,val_dataset,dataset_list=[]) :
+        datasets = {}
         for mode in self.modes :
             if mode > 0 :
                 dataset = train_dataset
