@@ -114,12 +114,12 @@ class Trainer :
             step_counter = 0            
         return loss_value/(i_batch+1)*self.num_batches_per_step
             
-    def validate(self) :
+    def validate(self,dataloader_key = 0) :
         with torch.no_grad():
             self.net.eval()
             self.objective_fns[0].eval()
             score = 0
-            with tqdm(self.dataloaders[0],desc="Evaluation Epoch") as loader :
+            with tqdm(self.dataloaders[dataloader_key],desc="Evaluation Epoch") as loader :
                 for i_batch,sample_batch in enumerate(loader) :
                     inputs = [inp.to(self.device) for inp in sample_batch['inputs']]
                     ground_truths = [gt.to(self.device) for gt in sample_batch['ground_truths']]
@@ -153,6 +153,7 @@ class Trainer :
                 self.dataloaders[mode] = dataloader.DataLoader(dataset,**get(self.loader_options,mode))
             else :
                 self.dataloaders[mode] = [dataloader.DataLoader(data,**get(self.loader_options,mode)) for data in dataset]
+         
         best_epoch = -1
         with trange(self.max_epochs,desc="Epochs") as epoch_iters :
             for epoch in epoch_iters :
@@ -168,7 +169,7 @@ class Trainer :
                     self.scheduler.step(val_loss)
                 if self.val_max_score >= val_loss :
                     self.val_max_score = val_loss
-                    best_train_loss = train_loss
+                    best_train_loss = [self.validate(dataloader_key = mode) for mode in self.modes]
                     best_epoch = epoch
                     self.patience_counter = 0
                     torch.save(self.net.state_dict(),self.model_file)
