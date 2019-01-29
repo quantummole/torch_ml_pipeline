@@ -144,6 +144,7 @@ class Trainer :
 
     def execute(self,datasets) :
         epoch_scores = []
+        best_train_loss = np.nan
         self.dataloaders = {}
         get = lambda myD,key : myD[key] if key in myD else myD[0]
         for mode in datasets.keys() :
@@ -167,6 +168,7 @@ class Trainer :
                     self.scheduler.step(val_loss)
                 if self.val_max_score >= val_loss :
                     self.val_max_score = val_loss
+                    best_train_loss = train_loss
                     best_epoch = epoch
                     self.patience_counter = 0
                     torch.save(self.net.state_dict(),self.model_file)
@@ -174,7 +176,7 @@ class Trainer :
                     self.patience_counter += 1
                     if self.patience_counter == self.patience :
                         break
-                epoch_iters.set_postfix(best_epoch = best_epoch,best_validation_loss =  self.val_max_score , training_loss = train_loss, config_id = self.Evaluator.config_id)
+                epoch_iters.set_postfix(best_epoch = best_epoch,best_validation_loss =  self.val_max_score , best_train_loss = best_train_loss, training_loss = train_loss, config_id = self.Evaluator.config_id)
         self.inference_iters = self.inference_iters if self.inference_iters else 0.1*best_epoch
         for i in range(self.inference_iters) :
             self.infer()
