@@ -44,7 +44,7 @@ class DatasetGenerator :
             if mode >= 0 :
                 dataset = self.dataset_class(data=dataset,mode=mode,**self.dataset_class_params[mode])
             else :
-                dataset_list = [val_dataset]+dataset_list
+                dataset_list = [train_dataset,val_dataset]+dataset_list
                 dataset = [self.dataset_class(data=dataset,mode=0,**self.dataset_class_params[0]) for dataset in dataset_list]
                 mode = 'inference'
             datasets[mode] = dataset
