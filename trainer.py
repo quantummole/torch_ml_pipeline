@@ -40,6 +40,24 @@ class SupervisedTrainClosure :
             inputs = [Variable(inp.data + 0.007*(grad-0.5),requires_grad=True) for inp,grad in zip(inputs,grads)]
         return loss_val
 
+
+class EarlyStopper :
+    def __init__(self) :
+        self.validation_loss = 1e+10
+    def __call__(self,training_loss,validation_loss,epoch) :
+        if self.validation_loss >= validation_loss :
+            self.validation_loss = validation_loss
+            return True
+        return False
+
+class BasicStopper :
+    def __init__(self) :
+        self.training_loss = 1e+10
+        self.validation_loss = 1e+10
+        self.best_epoch = -1
+    def __call__(self,training_loss,validation_loss,epoch) :
+        return True
+
 class Trainer :
     def __init__(self,network,network_params,
                  optimizer,optimizer_params,
@@ -48,12 +66,12 @@ class Trainer :
                  evaluator,
                  max_epochs,
                  objective_fns,
-                 val_max_score=1e+5,
                  adversarial_steps = 1,
                  num_batches_per_step = 1,
                  inference_iters = None,
                  patience = None,
-                 train_closure = SupervisedTrainClosure) :
+                 train_closure = SupervisedTrainClosure,
+                 early_stopping = BasicStopper) :
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.network = network
         self.network_params = network_params
@@ -74,13 +92,13 @@ class Trainer :
         self.optimizer = self.optimizer_class(list(self.net.parameters())+objective_fn_params,**self.optimizer_params)
         self.scheduler = self.scheduler_class(self.optimizer,**self.scheduler_params)
         self.max_epochs = max_epochs
-        self.val_max_score = val_max_score
         self.adversarial_steps = adversarial_steps
         self.num_batches_per_step = num_batches_per_step
         self.patience = patience if patience else int(0.2*self.max_epochs)
         self.patience_counter = 0
         self.inference_iters = inference_iters
         self.train_closure = train_closure()
+        self.early_stopping = early_stopping()
     def train(self,mode) :
         self.net.train()
         self.objective_fns[mode].train()
@@ -145,6 +163,7 @@ class Trainer :
     def execute(self,datasets) :
         epoch_scores = []
         best_train_loss = np.nan
+        best_val_loss = np.nan
         self.dataloaders = {}
         get = lambda myD,key : myD[key] if key in myD else myD[0]
         for mode in datasets.keys() :
@@ -167,8 +186,8 @@ class Trainer :
                 epoch_scores.append(scores)
                 if not issubclass(self.scheduler_class,torch.optim.lr_scheduler._LRScheduler) :
                     self.scheduler.step(val_loss)
-                if self.val_max_score >= val_loss :
-                    self.val_max_score = val_loss
+                if  self.early_stopping(train_loss,val_loss,epoch) :
+                    best_val_loss = val_loss
                     best_train_loss = [self.validate(dataloader_key = mode) for mode in self.modes]
                     best_epoch = epoch
                     self.patience_counter = 0
@@ -177,7 +196,7 @@ class Trainer :
                     self.patience_counter += 1
                     if self.patience_counter == self.patience :
                         break
-                epoch_iters.set_postfix(best_epoch = best_epoch,best_validation_loss =  self.val_max_score , best_train_loss = best_train_loss, training_loss = train_loss, config_id = self.Evaluator.config_id)
+                epoch_iters.set_postfix(best_epoch = best_epoch,best_validation_loss =  best_val_loss , best_train_loss = best_train_loss, training_loss = train_loss, config_id = self.Evaluator.config_id)
         self.inference_iters = self.inference_iters if self.inference_iters else 0.1*best_epoch
         for i in range(self.inference_iters) :
             self.infer()
