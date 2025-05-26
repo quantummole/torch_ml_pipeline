@@ -57,17 +57,6 @@ class MultiLabelBCE(nn.Module) :
         loss = self.loss_fn(logits/self.temperature,target)
         return loss
 
-class MaxEntropyLoss(nn.Module) :
-    def __init__(self) :
-        super(MaxEntropyLoss,self).__init__()
-    def forward(self,logits,target = None) :
-        logits = logits.view(logits.shape[0],logits.shape[1],-1)
-        predictions = tfunc.softmax(logits,dim=1)
-        log_predictions = tfunc.log_softmax(logits,dim=1)
-        self_entropy = predictions*log_predictions
-        entropy = torch.sum(self_entropy,dim=1)
-        loss = entropy.mean()
-        return loss
 
 class MarginLoss(nn.Module) :
     def __init__(self) :
@@ -118,9 +107,9 @@ class MultiLabelSoftmaxLoss(nn.Module) :
         loss = -1*log_likelihood.mean()
         return loss
         
-class SoftDice(nn.Module) :
+class SoftDiceLoss(nn.Module) :
     def __init__(self,smooth=1.,gamma = 0., temperature = 1.) :
-        super(SoftDice,self).__init__()
+        super(SoftDiceLoss,self).__init__()
         self.smooth = smooth
         self.gamma = gamma
         self.temperature = temperature
@@ -136,7 +125,7 @@ class SoftDice(nn.Module) :
         union = (factor*(predictions + outputs_onehot)).sum(dim=2) - intersection
         loss = -torch.log(((intersection+self.smooth)/(union+self.smooth)).mean(dim=1))
         return torch.mean(loss)
-
+    
 class DiceAccuracy(nn.Module) :
     def __init__(self,smooth=1.) :
         super(DiceAccuracy,self).__init__()

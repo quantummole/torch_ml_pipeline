@@ -10,7 +10,7 @@ from bootstrap_strategy import OverSample,UnderSample
 from search_strategy import GridSearch
 from datasets import DatasetGenerator,ImageClassificationDataset
 from models import create_net, PreTrainedClassifier, ResnetModels, DensenetModels
-from loss import SupervisedMetricList, Accuracy
+from losses.loss import SupervisedMetricList, Accuracy
 from evaluator import Evaluator
 from pipeline_components import Pipeline, PipelineOp
 from config_sets import DictConfig, ExclusiveConfigs, NamedConfig, CombinerConfig
