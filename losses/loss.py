@@ -48,15 +48,6 @@ class Accuracy(nn.Module) :
         _,vals = torch.max(predictions,dim=1)
         return 1.0 - torch.mean((vals.view(-1,1)==labels.view(-1,1)).type_as(predictions))
 
-class MultiLabelBCE(nn.Module) :
-    def __init__(self,temperature = 1.) :
-        super(MultiLabelBCE,self).__init__()
-        self.loss_fn = nn.BCEWithLogitsLoss()
-        self.temperature = temperature
-    def forward(self,logits,target) :
-        loss = self.loss_fn(logits/self.temperature,target)
-        return loss
-
 
 class MarginLoss(nn.Module) :
     def __init__(self) :
@@ -71,41 +62,6 @@ class MarginLoss(nn.Module) :
         predictions =  predictions*(torch.sum(torch.exp(-1*logits)*outputs_onehot,dim=1))
         return torch.mean(torch.log(1 + predictions))
 
-class FocalCELoss(nn.Module) :
-    def __init__(self,gamma = 0, temperature = 1.) :
-        super(FocalCELoss,self).__init__()
-        self.gamma = gamma
-        self.temperature = temperature
-    def forward(self,logits,target) :
-        logits = logits.view(logits.shape[0],logits.shape[1],-1)/self.temperature
-        target = target.view(logits.shape[0],-1)
-        predictions = tfunc.softmax(logits,dim=1)
-        outputs_onehot = torch.zeros_like(logits)
-        outputs_onehot = outputs_onehot.scatter(1,target.view(logits.shape[0],1,-1),1.0)
-        class_counts = outputs_onehot.sum(dim=0,keepdim=True)
-        weights = logits.shape[0]/torch.where(class_counts>0,class_counts,class_counts+1)
-        factor = (1- predictions).pow(self.gamma)
-        loss = tfunc.nll_loss(tfunc.log_softmax(logits,dim=1)*factor*weights,target)
-        return loss
-
-class MultiLabelSoftmaxLoss(nn.Module) :
-    def __init__(self,temperature=1.) :
-        super(MultiLabelSoftmaxLoss,self).__init__()
-        self.temperature = temperature
-    def forward(self,logits,target) :
-        logits = logits.view(logits.shape[0],logits.shape[1],-1)/self.temperature
-        logits_max,_ = torch.max(logits,dim=2,keepdim=True)
-        target = target.view(logits.shape[0],-1)
-        outputs_onehot = torch.zeros_like(logits)
-        outputs_onehot = outputs_onehot.scatter(1,target.view(logits.shape[0],1,-1),1.0)
-        logits = torch.exp(logits-logits_max)
-        numerator = logits*outputs_onehot
-        denominator = numerator + ((1-outputs_onehot)*logits).sum(dim=2,keepdim=True)
-        log_predictions = torch.log(torch.clamp(numerator/denominator,1e-7,1-1e-7))
-        class_counts = outputs_onehot.sum(dim=2)
-        log_likelihood = (log_predictions*outputs_onehot).sum(dim=2)/torch.where(class_counts>0,class_counts,class_counts+1)
-        loss = -1*log_likelihood.mean()
-        return loss
         
 class SoftDiceLoss(nn.Module) :
     def __init__(self,smooth=1.,gamma = 0., temperature = 1.) :

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+"""
+@author: quantummole
+"""
+
 import torch
 import torch.nn as nn
 
