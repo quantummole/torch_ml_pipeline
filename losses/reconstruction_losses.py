@@ -70,7 +70,7 @@ class PerceptualLoss(nn.Module):
         elif self.reduction == 'sum_mean':
             return torch.sum([loss.mean() for loss in losses])
         elif self.reduction == 'none':
-            return loss
+            return losses
         else:
             raise ValueError("Invalid reduction method. Use 'mean', 'sum', 'sum_mean' or 'none'.")
 
