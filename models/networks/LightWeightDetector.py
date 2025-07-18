@@ -5,15 +5,16 @@
 
 import torch
 import torch.nn as nn
-import torchvision
 
 class SingleResolutionNeck(nn.Module):
-    def __init__(self, in_channel_list, target_channel, conv_type):
+    def __init__(self, in_channel_list, target_channel_list, conv_type):
         super(SingleResolutionNeck, self).__init__()
         self.lateral_convs = nn.ModuleList()
         assert len(in_channel_list) % 2 == 1, "to use single resolution neck, the number of input channels must be odd"
-        for in_channels in in_channel_list:
+        for in_channels, target_channels in (in_channel_list):
             self.lateral_convs.append(conv_type(in_channels, target_channel, kernel_size=1))
+    def forward(self, ):
+        pass
         
     
 
@@ -48,5 +49,12 @@ class LightWeightDetector(nn.Module):
         self.backbone.activations.clear()
         _ = self.backbone(x)
         activations = self.backbone.activations
+        print([i.shape for i in activations])
+
+
+if __name__ == "__main__":
+    import torchvision
+    backbone = torchvision.models.mobilenet_v3_small(pretrained=True)
+    print(backbone)
 
 
