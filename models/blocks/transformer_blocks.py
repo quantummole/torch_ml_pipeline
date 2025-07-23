@@ -47,7 +47,7 @@ class LearnablePositionalEncoding(nn.Module):
         nn.init.normal_(self.positional_encoding, mean=0.0, std=0.02)
     def forward(self, x):
         batch_size, seq_length, embed_dim = x.size()
-        assert embed_dim == self.embed_dim, f"Input embed_dim {embed_dim} does not match expected {self.embed_dim}
+        assert embed_dim == self.embed_dim, f"Input embed_dim {embed_dim} does not match expected {self.embed_dim}"
         assert seq_length <= self.max_len, f"Sequence length {seq_length} exceeds max length {self.max_len}"
         return x + self.positional_encoding[:seq_length].unsqueeze(0)
 
