@@ -12,7 +12,7 @@ class SingleResolutionNeck(nn.Module):
         self.lateral_convs = nn.ModuleList()
         assert len(in_channel_list) % 2 == 1, "to use single resolution neck, the number of input channels must be odd"
         for in_channels, target_channels in (in_channel_list):
-            self.lateral_convs.append(conv_type(in_channels, target_channel, kernel_size=1))
+            self.lateral_convs.append(conv_type(in_channels, target_channels, kernel_size=1))
     def forward(self, ):
         pass
         

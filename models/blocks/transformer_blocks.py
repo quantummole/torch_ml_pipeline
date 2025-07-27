@@ -98,9 +98,9 @@ class PatchifyImage(nn.Module):
             y = y.view(batch_size, self.in_channels, height, width)
             return y
 
-class MultiHeadAttention(nn.Module):
+class MultiHeadSelfAttention(nn.Module):
     def __init__(self, embed_dim, num_heads, kernel_func, dropout=0.1):
-        super(MultiHeadAttention, self).__init__()
+        super(MultiHeadSelfAttention, self).__init__()
         assert embed_dim % num_heads == 0, "must be multiple for me to make it fast"
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -128,8 +128,42 @@ class MultiHeadAttention(nn.Module):
             attn_output = torch.matmul(attn_weights, v)
             attn_output = attn_output.transpose(1, 2).reshape(batch_size, seq_length, self.embed_dim)
             output = self.norm(x +  self.proj_drop(self.out_proj(attn_output)))
-            return output
+            return qkv, output
         
+class MultiHeadCrossAttention(nn.Module):
+    def __init__(self, embed_dim, num_heads, kernel_func, dropout=0.1):
+        super(MultiHeadSelfAttention, self).__init__()
+        assert embed_dim % num_heads == 0, "must be multiple for me to make it fast"
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.kernel_func = kernel_func
+
+        if self.head_dim * num_heads != embed_dim:
+            raise ValueError(f"embed_dim must be divisible by num_heads (got {embed_dim} and {num_heads})")
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        self.attn_drop = nn.Dropout(dropout)
+        self.proj_drop = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+
+        def forward(self, x, qkv_input):
+            batch_size, seq_length, _ = x.size()
+            q = self.q_proj(x).reshape(batch_size, seq_length, self.num_heads, self.head_dim)
+            q = q.transpose(1, 2)
+            _, k, v = qkv_input.chunk(2, dim=-1)
+            k = k.transpose(1, 2)
+            v = v.transpose(1, 2)
+            attn_weights = self.kernel_func(q,k)
+            attn_weights = self.attn_drop(attn_weights)
+            attn_output = torch.matmul(attn_weights, v)
+            attn_output = attn_output.transpose(1, 2).reshape(batch_size, seq_length, self.embed_dim)
+            output = self.norm(x +  self.proj_drop(self.out_proj(attn_output)))
+            return output
+
+
+
 class FFN(nn.Module):
     def __init__(self, embed_dim, ffn_dim, dropout=0.1):
         super(FFN, self).__init__()
@@ -143,30 +177,32 @@ class FFN(nn.Module):
         output = self.norm(x + output)
         return output
     
-class TransformerBlock(nn.Module):
+class TransformerEncoderBlock(nn.Module):
     def __init__(self, embed_dim, num_heads, ffn_dim, kernel_func, dropout=0.1):
-        super(TransformerBlock, self).__init__()
-        self.attention = MultiHeadAttention(embed_dim, num_heads, kernel_func, dropout)
+        super(TransformerEncoderBlock, self).__init__()
+        self.attention = MultiHeadSelfAttention(embed_dim, num_heads, kernel_func, dropout)
         self.ffn = FFN(embed_dim, ffn_dim, dropout)
 
     def forward(self, x):
-        x = self.attention(x)
+        qkv, x = self.attention(x)
         x = self.ffn(x)
-        return x
+        return qkv, x
     
 class TransformerEncoder(nn.Module):
     def __init__(self, embed_dim, num_heads, ffn_dim, num_layers, kernel_func, dropout=0.1):
         super(TransformerEncoder, self).__init__()
         self.layers = nn.ModuleList([
-            TransformerBlock(embed_dim, num_heads, ffn_dim, dropout) for _ in range(num_layers)
+            TransformerEncoderBlock(embed_dim, num_heads, ffn_dim, dropout) for _ in range(num_layers)
         ])
         self.norm = nn.LayerNorm(embed_dim)
         self.adaptor = nn.Linear(embed_dim, embed_dim)  # Optional adapter layer
 
     def forward(self, x):
+        qkvs = []
         for layer in self.layers:
-            x = layer(x)
-        return self.adaptor(self.norm(x))  # Final normalization
+            qkv_i, x = layer(x)
+            qkvs.append(qkv_i)
+        return qkvs, self.adaptor(self.norm(x))  # Final normalization
 
 
 

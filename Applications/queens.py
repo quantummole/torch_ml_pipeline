@@ -1,6 +1,12 @@
 import cv2
 import numpy as np
+"""
+Will eventually contain code to extract the grid from a queens image.
+This is a simple version that assumes the grid is well defined and does not
+have any noise or other artifacts.
 
+Will then solve the queens problem using a SAT solver.
+"""
 def extract_grid_simple(img_path):
     img = cv2.imread(img_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
